@@ -1,5 +1,8 @@
 import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
+import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
+import { aws_cloudfront_origins as origins } from 'aws-cdk-lib';
 import { aws_cognito as cognito } from 'aws-cdk-lib';
+import { aws_s3 as s3 } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 
 /**
@@ -19,6 +22,12 @@ export class OidcSandboxStack extends Stack {
 
   /** Cognito Domain - ホストUIのドメイン */
   public readonly userPoolDomain: cognito.UserPoolDomain;
+
+  /** S3バケット - フロントエンドの静的ファイルをホスティング */
+  public readonly websiteBucket: s3.Bucket;
+
+  /** CloudFrontディストリビューション - HTTPSでコンテンツを配信 */
+  public readonly distribution: cloudfront.Distribution;
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
@@ -120,6 +129,45 @@ export class OidcSandboxStack extends Stack {
     });
 
     // ============================================================
+    // S3バケット（フロントエンドの静的ファイル）
+    // ============================================================
+
+    // S3バケットの作成
+    // - フロントエンドの HTML/JS/CSS を格納
+    // - CloudFront 経由でのみアクセス可能（直接アクセスは不可）
+    this.websiteBucket = new s3.Bucket(this, 'WebsiteBucket', {
+      // パブリックアクセスを全てブロック（CloudFront経由でのみアクセス）
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      // バージョニング無効（学習用途のため不要）
+      versioned: false,
+      // スタック削除時にバケットも削除（学習用途のため）
+      removalPolicy: RemovalPolicy.DESTROY,
+      // バケット削除時にオブジェクトも自動削除
+      autoDeleteObjects: true,
+    });
+
+    // ============================================================
+    // CloudFrontディストリビューション（HTTPS配信）
+    // ============================================================
+
+    // CloudFront ディストリビューションの作成
+    // - S3 の静的ファイルを HTTPS で配信
+    // - OAC（Origin Access Control）で S3 へのアクセスを制御
+    this.distribution = new cloudfront.Distribution(this, 'Distribution', {
+      // デフォルトビヘイビア: S3バケットをオリジンとして設定
+      // S3BucketOrigin.withOriginAccessControl を使用すると OAC が自動設定される
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(this.websiteBucket),
+        // HTTPS へのリダイレクトを有効化
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      },
+      // ルートアクセス時に返すファイル
+      defaultRootObject: 'index.html',
+      // 価格クラス: 北米・欧州のみ（コスト削減）
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+    });
+
+    // ============================================================
     // Outputs（デプロイ後に確認するための出力）
     // ============================================================
 
@@ -138,7 +186,16 @@ export class OidcSandboxStack extends Stack {
       description: 'Cognito Domain',
     });
 
-    // TODO: Issue #3 - S3 + CloudFront構築
+    new CfnOutput(this, 'CloudFrontUrl', {
+      value: `https://${this.distribution.distributionDomainName}`,
+      description: 'CloudFront Distribution URL',
+    });
+
+    new CfnOutput(this, 'WebsiteBucketName', {
+      value: this.websiteBucket.bucketName,
+      description: 'S3 Bucket Name for Frontend',
+    });
+
     // TODO: Issue #5 - API Gateway構築
     // TODO: Issue #6 - Lambda関数作成
   }

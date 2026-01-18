@@ -16,12 +16,12 @@
 
 ### ゴール / 完了条件（Acceptance Criteria）
 
-- [ ] S3バケットが非公開設定で作成されている
-- [ ] CloudFront ディストリビューションが作成されている
-- [ ] OAC（Origin Access Control）でS3にアクセスできる
-- [ ] デフォルトルートオブジェクトが `index.html` に設定されている
-- [ ] HTTPからHTTPSへのリダイレクトが有効になっている
-- [ ] CloudFront URLがCDK出力に表示される
+- [x] S3バケットが非公開設定で作成されている
+- [x] CloudFront ディストリビューションが作成されている
+- [x] OAC（Origin Access Control）でS3にアクセスできる
+- [x] デフォルトルートオブジェクトが `index.html` に設定されている
+- [x] HTTPからHTTPSへのリダイレクトが有効になっている
+- [x] CloudFront URLがCDK出力に表示される
 
 ### テスト観点
 
