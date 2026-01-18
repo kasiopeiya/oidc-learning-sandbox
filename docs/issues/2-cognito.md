@@ -16,12 +16,12 @@ OIDCのOP（OpenID Provider）として機能するCognito User PoolとApp Clien
 
 ### ゴール / 完了条件（Acceptance Criteria）
 
-- [ ] User Pool が作成され、emailでサインイン可能な設定になっている
-- [ ] App Client が Confidential Client として作成されている
-- [ ] PKCE（S256）が有効になっている
-- [ ] OAuth スコープに openid, email, profile が設定されている
-- [ ] Cognito Domain が設定されている
-- [ ] `npx cdk deploy` でリソースが作成される
+- [x] User Pool が作成され、emailでサインイン可能な設定になっている
+- [x] App Client が Confidential Client として作成されている
+- [x] PKCE（S256）が有効になっている
+- [x] OAuth スコープに openid, email, profile が設定されている
+- [x] Cognito Domain が設定されている
+- [x] `npx cdk deploy` でリソースが作成される
 
 ### テスト観点
 
