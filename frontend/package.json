@@ -1,0 +1,13 @@
+{
+  "name": "oidc-sandbox-frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "npm run build:ts && npm run build:html",
+    "build:ts": "esbuild src/app.ts --bundle --outfile=dist/js/app.js --minify",
+    "build:html": "cp -r public/* dist/"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "typescript": "^5.0.0"
+  }
+}

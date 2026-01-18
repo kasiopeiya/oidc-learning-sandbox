@@ -1,8 +1,11 @@
+import * as path from 'path';
+
 import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
 import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
 import { aws_cloudfront_origins as origins } from 'aws-cdk-lib';
 import { aws_cognito as cognito } from 'aws-cdk-lib';
 import { aws_s3 as s3 } from 'aws-cdk-lib';
+import { aws_s3_deployment as s3deploy } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 
 /**
@@ -165,6 +168,21 @@ export class OidcSandboxStack extends Stack {
       defaultRootObject: 'index.html',
       // 価格クラス: 北米・欧州のみ（コスト削減）
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+    });
+
+    // ============================================================
+    // S3へのフロントエンドファイルのデプロイ
+    // ============================================================
+
+    // BucketDeployment で frontend/dist の内容を S3 にアップロード
+    // - CDK デプロイ時に自動的にファイルがアップロードされる
+    // - CloudFront のキャッシュを無効化して、最新のファイルが配信されるようにする
+    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
+      sources: [s3deploy.Source.asset(path.join(__dirname, '../../frontend/dist'))],
+      destinationBucket: this.websiteBucket,
+      // CloudFront キャッシュの無効化
+      distribution: this.distribution,
+      distributionPaths: ['/*'],
     });
 
     // ============================================================

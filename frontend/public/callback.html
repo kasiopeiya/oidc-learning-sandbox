@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>認証成功 - OIDC学習サンドボックス</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .success { color: green; }
+    .info { margin: 20px 0; }
+    .info dt { font-weight: bold; }
+    .info dd { margin: 5px 0 15px 0; }
+  </style>
+</head>
+<body>
+  <h1 class="success">&#10003; 認証成功</h1>
+  <dl class="info">
+    <dt>メールアドレス</dt>
+    <dd id="user-email"></dd>
+    <dt>ユーザーID</dt>
+    <dd id="user-sub"></dd>
+  </dl>
+  <a href="/">&rarr; トップへ戻る</a>
+  <script src="/js/app.js"></script>
+</body>
+</html>
