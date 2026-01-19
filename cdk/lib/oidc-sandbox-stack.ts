@@ -1,6 +1,6 @@
 import * as path from 'path';
 
-import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
+import { CfnOutput, Duration, Fn, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
 import { aws_apigatewayv2 as apigw } from 'aws-cdk-lib';
 import { aws_apigatewayv2_integrations as integrations } from 'aws-cdk-lib';
 import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
@@ -94,39 +94,16 @@ export class OidcSandboxStack extends Stack {
     // App Client の作成
     // - Relying Party（RP）が Cognito と通信するために必要
     // - クライアントシークレットを持つ Confidential Client として設定
+    // 注意: OAuth設定（callbackUrls, logoutUrls）は CloudFront 作成後に設定するため、
+    //       ここでは oAuth を指定せず、後から CfnUserPoolClient で設定する
     this.userPoolClient = this.userPool.addClient('UserPoolClient', {
       // Confidential Client: クライアントシークレットを生成
       // バックエンド（Lambda）からトークンエンドポイントを呼び出す際に使用
       generateSecret: true,
-      // OAuth 2.0 / OIDC の設定
-      oAuth: {
-        // 認可コードフロー: OIDCの標準的なフロー
-        // 認可コードを受け取り、バックエンドでトークンに交換する
-        flows: {
-          authorizationCodeGrant: true,
-        },
-        // OAuth スコープ: 取得するユーザー情報の範囲
-        // - openid: OIDC 必須スコープ（ID トークンを取得）
-        // - email: メールアドレスを取得
-        // - profile: プロフィール情報（名前など）を取得
-        scopes: [
-          cognito.OAuthScope.OPENID,
-          cognito.OAuthScope.EMAIL,
-          cognito.OAuthScope.PROFILE,
-        ],
-        // コールバックURL: 認証後のリダイレクト先
-        // CloudFront の URL は Issue #3 で設定するため、仮の値を設定
-        // 本来は CloudFront デプロイ後に更新が必要
-        callbackUrls: ['https://localhost/callback'],
-        // サインアウトURL: ログアウト後のリダイレクト先
-        logoutUrls: ['https://localhost'],
-      },
       // トークンの有効期限設定
       accessTokenValidity: Duration.hours(1),
       idTokenValidity: Duration.hours(1),
       refreshTokenValidity: Duration.days(30),
-      // PKCE を必須にする設定はクライアント側で実装
-      // Cognito は PKCE パラメータがあれば自動的に検証する
     });
 
     // ============================================================
@@ -178,8 +155,8 @@ export class OidcSandboxStack extends Stack {
     // API Gateway のエンドポイント URL からホスト名を抽出
     // 例: https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com
     // → xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com
-    const apiEndpointUrl = this.httpApi.apiEndpoint;
-    const apiDomainName = apiEndpointUrl.replace('https://', '');
+    // 注意: apiEndpoint は CloudFormation Token のため、Fn.select と Fn.split を使用
+    const apiDomainName = Fn.select(2, Fn.split('/', this.httpApi.apiEndpoint));
 
     // ============================================================
     // CloudFrontディストリビューション（HTTPS配信）
@@ -216,6 +193,29 @@ export class OidcSandboxStack extends Stack {
       // 価格クラス: 北米・欧州のみ（コスト削減）
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     });
+
+    // ============================================================
+    // Cognito User Pool Client の OAuth 設定
+    // ============================================================
+
+    // CloudFront の URL が確定した後、CfnUserPoolClient を使って OAuth 設定を追加
+    // L2 Construct では後から設定を変更できないため、L1 Construct（Cfn）を使用
+    const cfnUserPoolClient = this.userPoolClient.node
+      .defaultChild as cognito.CfnUserPoolClient;
+
+    // OAuth 2.0 / OIDC の設定を追加
+    // - 認可コードフロー: 認可コードを受け取り、バックエンドでトークンに交換
+    // - スコープ: openid（OIDC必須）、email、profile
+    // - コールバックURL: CloudFront 経由の /api/auth/callback
+    cfnUserPoolClient.allowedOAuthFlows = ['code'];
+    cfnUserPoolClient.allowedOAuthFlowsUserPoolClient = true;
+    cfnUserPoolClient.allowedOAuthScopes = ['openid', 'email', 'profile'];
+    cfnUserPoolClient.callbackUrLs = [
+      `https://${this.distribution.distributionDomainName}/api/auth/callback`,
+    ];
+    cfnUserPoolClient.logoutUrLs = [
+      `https://${this.distribution.distributionDomainName}`,
+    ];
 
     // ============================================================
     // S3へのフロントエンドファイルのデプロイ
