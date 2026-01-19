@@ -1,6 +1,7 @@
 import * as path from 'path';
 
 import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
+import { aws_apigatewayv2 as apigw } from 'aws-cdk-lib';
 import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
 import { aws_cloudfront_origins as origins } from 'aws-cdk-lib';
 import { aws_cognito as cognito } from 'aws-cdk-lib';
@@ -31,6 +32,9 @@ export class OidcSandboxStack extends Stack {
 
   /** CloudFrontディストリビューション - HTTPSでコンテンツを配信 */
   public readonly distribution: cloudfront.Distribution;
+
+  /** HTTP API - バックエンドAPIのエントリーポイント */
+  public readonly httpApi: apigw.HttpApi;
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
@@ -150,12 +154,32 @@ export class OidcSandboxStack extends Stack {
     });
 
     // ============================================================
+    // API Gateway HTTP API（バックエンドAPIのエントリーポイント）
+    // ============================================================
+
+    // HTTP API の作成
+    // - REST API より安価で低レイテンシ
+    // - Lambda との統合に必要な基本機能を提供
+    // - CORS 設定は CloudFront 経由のため不要
+    this.httpApi = new apigw.HttpApi(this, 'HttpApi', {
+      // API 名は CDK が自動生成（スタック名がプレフィックスになる）
+      description: 'OIDC学習サンドボックス - バックエンドAPI',
+    });
+
+    // API Gateway のエンドポイント URL からホスト名を抽出
+    // 例: https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com
+    // → xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com
+    const apiEndpointUrl = this.httpApi.apiEndpoint;
+    const apiDomainName = apiEndpointUrl.replace('https://', '');
+
+    // ============================================================
     // CloudFrontディストリビューション（HTTPS配信）
     // ============================================================
 
     // CloudFront ディストリビューションの作成
     // - S3 の静的ファイルを HTTPS で配信
     // - OAC（Origin Access Control）で S3 へのアクセスを制御
+    // - /api/* パスを API Gateway に転送
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       // デフォルトビヘイビア: S3バケットをオリジンとして設定
       // S3BucketOrigin.withOriginAccessControl を使用すると OAC が自動設定される
@@ -163,6 +187,20 @@ export class OidcSandboxStack extends Stack {
         origin: origins.S3BucketOrigin.withOriginAccessControl(this.websiteBucket),
         // HTTPS へのリダイレクトを有効化
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      },
+      // /api/* パスを API Gateway に転送するビヘイビア
+      additionalBehaviors: {
+        '/api/*': {
+          origin: new origins.HttpOrigin(apiDomainName),
+          // HTTPS へのリダイレクトを有効化
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          // API リクエストはキャッシュしない
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          // オリジンへのリクエストに全てのヘッダー、クエリ文字列、Cookie を転送
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+          // GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE を許可
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+        },
       },
       // ルートアクセス時に返すファイル
       defaultRootObject: 'index.html',
@@ -214,7 +252,11 @@ export class OidcSandboxStack extends Stack {
       description: 'S3 Bucket Name for Frontend',
     });
 
-    // TODO: Issue #5 - API Gateway構築
+    new CfnOutput(this, 'ApiEndpoint', {
+      value: this.httpApi.apiEndpoint,
+      description: 'API Gateway HTTP API Endpoint',
+    });
+
     // TODO: Issue #6 - Lambda関数作成
   }
 }
