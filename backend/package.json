@@ -1,0 +1,19 @@
+{
+  "name": "oidc-sandbox-backend",
+  "version": "1.0.0",
+  "description": "OIDC学習サンドボックス - バックエンド（Lambda関数）",
+  "main": "src/handlers/login.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix"
+  },
+  "dependencies": {
+    "openid-client": "^6.3.3"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.147",
+    "@types/node": "^22.10.7",
+    "typescript": "^5.7.3"
+  }
+}

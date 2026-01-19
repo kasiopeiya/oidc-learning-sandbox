@@ -2,9 +2,12 @@ import * as path from 'path';
 
 import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
 import { aws_apigatewayv2 as apigw } from 'aws-cdk-lib';
+import { aws_apigatewayv2_integrations as integrations } from 'aws-cdk-lib';
 import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
 import { aws_cloudfront_origins as origins } from 'aws-cdk-lib';
 import { aws_cognito as cognito } from 'aws-cdk-lib';
+import { aws_lambda as lambda } from 'aws-cdk-lib';
+import { aws_lambda_nodejs as nodejs } from 'aws-cdk-lib';
 import { aws_s3 as s3 } from 'aws-cdk-lib';
 import { aws_s3_deployment as s3deploy } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
@@ -35,6 +38,12 @@ export class OidcSandboxStack extends Stack {
 
   /** HTTP API - バックエンドAPIのエントリーポイント */
   public readonly httpApi: apigw.HttpApi;
+
+  /** Login Lambda関数 - 認可リクエストURL生成 */
+  public readonly loginFunction: nodejs.NodejsFunction;
+
+  /** Callback Lambda関数 - トークン交換・検証 */
+  public readonly callbackFunction: nodejs.NodejsFunction;
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
@@ -257,6 +266,87 @@ export class OidcSandboxStack extends Stack {
       description: 'API Gateway HTTP API Endpoint',
     });
 
-    // TODO: Issue #6 - Lambda関数作成
+    // ============================================================
+    // Lambda関数（OIDC の RP: Relying Party）
+    // ============================================================
+
+    // Lambda関数の共通設定
+    // - Node.js 24.x: 最新の LTS バージョン
+    // - arm64: コスト効率が良いアーキテクチャ
+    // - メモリ 256MB: 認証処理には十分
+    // - タイムアウト 10秒: トークン交換に余裕を持たせる
+    const lambdaCommonProps = {
+      runtime: lambda.Runtime.NODEJS_24_X,
+      architecture: lambda.Architecture.ARM_64,
+      memorySize: 256,
+      timeout: Duration.seconds(10),
+      // 環境変数: Cognito 情報と URL
+      environment: {
+        // Cognito User Pool ID
+        COGNITO_USER_POOL_ID: this.userPool.userPoolId,
+        // Cognito App Client ID
+        COGNITO_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        // Cognito App Client Secret（Secrets Manager 推奨だが学習用途のため環境変数で保持）
+        COGNITO_CLIENT_SECRET:
+          this.userPoolClient.userPoolClientSecret.unsafeUnwrap(),
+        // Cognito ドメイン（ホスト UI のベース URL）
+        COGNITO_DOMAIN: `https://${this.userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`,
+        // 認証後のリダイレクト先 URL（CloudFront 経由）
+        REDIRECT_URI: `https://${this.distribution.distributionDomainName}/api/auth/callback`,
+        // フロントエンドの URL（CloudFront）
+        FRONTEND_URL: `https://${this.distribution.distributionDomainName}`,
+      },
+      // esbuild によるバンドル設定
+      bundling: {
+        // 外部パッケージとして扱わない（全てバンドルに含める）
+        externalModules: [],
+      },
+    };
+
+    // Login Lambda関数
+    // - /api/auth/login エンドポイントを処理
+    // - 認可リクエスト URL を生成し、Cognito にリダイレクト
+    this.loginFunction = new nodejs.NodejsFunction(this, 'LoginFunction', {
+      ...lambdaCommonProps,
+      entry: path.join(__dirname, '../../backend/src/handlers/login.ts'),
+      handler: 'handler',
+      description: 'OIDC認可リクエストURL生成・リダイレクト',
+    });
+
+    // Callback Lambda関数
+    // - /api/auth/callback エンドポイントを処理
+    // - 認可コードをトークンに交換し、IDトークンを検証
+    this.callbackFunction = new nodejs.NodejsFunction(this, 'CallbackFunction', {
+      ...lambdaCommonProps,
+      entry: path.join(__dirname, '../../backend/src/handlers/callback.ts'),
+      handler: 'handler',
+      description: 'OIDCコールバック処理（トークン交換・検証）',
+    });
+
+    // ============================================================
+    // API Gateway ルート定義
+    // ============================================================
+
+    // /api/auth/login ルート
+    // - GET メソッドで認可リクエストを開始
+    this.httpApi.addRoutes({
+      path: '/api/auth/login',
+      methods: [apigw.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration(
+        'LoginIntegration',
+        this.loginFunction
+      ),
+    });
+
+    // /api/auth/callback ルート
+    // - GET メソッドで Cognito からのコールバックを処理
+    this.httpApi.addRoutes({
+      path: '/api/auth/callback',
+      methods: [apigw.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration(
+        'CallbackIntegration',
+        this.callbackFunction
+      ),
+    });
   }
 }
