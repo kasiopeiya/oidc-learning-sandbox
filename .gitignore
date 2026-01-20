@@ -36,7 +36,7 @@ npm-debug.log*
 # Test coverage
 coverage/
 
-# e2e test reports
-e2e/test-reports/
-e2e/test-results/
-e2e/playwright-report/
+# Integration test reports
+integration-tests/test-reports/
+integration-tests/test-results/
+integration-tests/playwright-report/

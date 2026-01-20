@@ -1,4 +1,4 @@
-# Issue #9: E2E動作確認・ドキュメント整備
+# Issue #9: 結合テスト・ドキュメント整備
 
 ### 背景 / 目的
 
@@ -9,7 +9,7 @@
 
 ### スコープ / 作業項目
 
-- 認証フロー全体の手動E2Eテスト
+- 認証フロー全体の結合テスト
 - 新規ユーザー登録フローの確認
 - エラーケースの確認
 - README.md の作成
@@ -24,8 +24,8 @@
 
 ### テスト観点
 
-- E2E: ブラウザでの認証フロー全体
-- 検証方法: 手動テストによる全画面遷移の確認
+- 結合テスト: HTTPレベルでの認証フロー検証
+- 検証方法: Playwrightによる自動テスト + 手動テストによる全画面遷移の確認
 
 ---
 
@@ -34,7 +34,7 @@
 ### 実装済みファイル一覧
 
 ```
-e2e/
+integration-tests/
 ├── package.json              # Playwright + AWS SDK 依存関係
 ├── tsconfig.json             # TypeScript設定
 ├── playwright.config.ts      # Playwright設定
@@ -62,7 +62,7 @@ e2e/
 
 ```bash
 # 1. 依存関係インストール
-cd e2e && npm install
+cd integration-tests && npm install
 
 # 2. Playwright ブラウザインストール
 npx playwright install chromium
