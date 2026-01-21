@@ -5,23 +5,34 @@
  * 認可リクエストURLを生成し、Cognito（OP）にリダイレクトする。
  *
  * 処理フロー:
- * 1. state, nonce, code_verifier を生成（各32バイトの暗号論的に安全なランダム文字列）
- * 2. code_challenge を計算（SHA256 + Base64URL）
- * 3. 生成した値を HttpOnly, Secure, SameSite=Lax の Cookie に保存
- * 4. 認可URLを構築して302リダイレクト
+ * 1. セッションIDを生成（暗号論的に安全なランダム文字列）
+ * 2. state, nonce, code_verifier を生成（各32バイト）
+ * 3. code_challenge を計算（SHA256 + Base64URL）
+ * 4. セッションIDをキーにして、state/nonce/code_verifier を DynamoDB に保存
+ * 5. セッションIDを HttpOnly, Secure, SameSite=Lax の Cookie に保存
+ * 6. 認可URLを構築して302リダイレクト
  *
  * セキュリティパラメータの役割:
  * - state: CSRF攻撃対策 - 認可リクエストとコールバックの紐付け
  * - nonce: リプレイ攻撃対策 - IDトークンと認可リクエストの紐付け
  * - code_verifier/code_challenge (PKCE): 認可コード横取り攻撃対策
+ *
+ * DynamoDB管理のメリット:
+ * - セキュリティパラメータがブラウザに渡らない（XSS対策）
+ * - サーバーサイドで一元管理できる
+ * - TTLで自動削除される
  */
 import {
   APIGatewayProxyEventV2,
   APIGatewayProxyResultV2,
 } from 'aws-lambda';
 
-import { createOidcCookies } from '../utils/cookie';
 import { generateOidcSecurityParams } from '../utils/pkce';
+import {
+  createSessionCookie,
+  generateSessionId,
+  saveSession,
+} from '../utils/session';
 
 /**
  * 認可リクエストで使用するOAuthスコープ
@@ -50,17 +61,22 @@ export const handler = async (
   });
 
   // ============================================================
-  // Step 1: セキュリティパラメータの生成
+  // Step 1: セッションIDとセキュリティパラメータの生成
   // ============================================================
 
+  // セッションIDを生成（256ビットのランダム文字列）
+  // このIDをCookieに保存し、DynamoDBのキーとして使用
+  const sessionId = generateSessionId();
+
   // state, nonce, code_verifier, code_challenge を一括生成
-  // - state: CSRF攻撃対策（Cookieに保存 → 認可URLに含める → コールバックで照合）
-  // - nonce: リプレイ攻撃対策（Cookieに保存 → 認可URLに含める → IDトークン内のnonceと照合）
-  // - code_verifier: PKCE用の秘密鍵（Cookieに保存 → トークン交換時に送信）
+  // - state: CSRF攻撃対策（DynamoDBに保存 → 認可URLに含める → コールバックで照合）
+  // - nonce: リプレイ攻撃対策（DynamoDBに保存 → 認可URLに含める → IDトークン内のnonceと照合）
+  // - code_verifier: PKCE用の秘密鍵（DynamoDBに保存 → トークン交換時に送信）
   // - code_challenge: code_verifierのSHA256ハッシュ（認可URLに含める）
   const { state, nonce, codeVerifier, codeChallenge } = generateOidcSecurityParams();
 
-  console.log('Security parameters generated', {
+  console.log('Session and security parameters generated', {
+    sessionIdLength: sessionId.length,
     stateLength: state.length,
     nonceLength: nonce.length,
     codeVerifierLength: codeVerifier.length,
@@ -68,7 +84,24 @@ export const handler = async (
   });
 
   // ============================================================
-  // Step 2: 認可URLの構築
+  // Step 2: セッションデータをDynamoDBに保存
+  // ============================================================
+
+  // セッションIDをキーにして、セキュリティパラメータをDynamoDBに保存
+  // TTL（5分）が設定され、自動的に削除される
+  try {
+    await saveSession(sessionId, { state, nonce, codeVerifier });
+  } catch (error) {
+    console.error('Failed to save session to DynamoDB', error);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Failed to initialize session' }),
+    };
+  }
+
+  // ============================================================
+  // Step 3: 認可URLの構築
   // ============================================================
 
   // 環境変数から必要な値を取得
@@ -139,15 +172,15 @@ export const handler = async (
   });
 
   // ============================================================
-  // Step 3: Cookieの設定と302リダイレクト
+  // Step 4: セッションCookieの設定と302リダイレクト
   // ============================================================
 
-  // セキュリティパラメータをCookieに保存
+  // セッションIDをCookieに保存（セキュリティパラメータはDynamoDBに保存済み）
   // HttpOnly, Secure, SameSite=Lax で保護
   // - HttpOnly: JavaScriptからアクセス不可（XSS対策）
   // - Secure: HTTPS接続でのみ送信
-  // - SameSite=Lax: クロスサイトリクエストでの送信を制限（CSRF対策）
-  const cookies = createOidcCookies(state, nonce, codeVerifier);
+  // - SameSite=Lax: Cognitoからのリダイレクト時にCookieが送信されるよう設定
+  const sessionCookie = createSessionCookie(sessionId);
 
   // 302 Found でCognitoの認可エンドポイントにリダイレクト
   // API Gateway HTTP API (v2) では cookies 配列を使用してCookieを設定
@@ -156,8 +189,8 @@ export const handler = async (
     headers: {
       Location: authorizationUrl,
     },
-    // HTTP API v2 形式: cookies 配列で複数のCookieを設定
-    cookies: cookies,
+    // HTTP API v2 形式: セッションIDのみをCookieに保存
+    cookies: [sessionCookie],
     body: '',
   };
 };

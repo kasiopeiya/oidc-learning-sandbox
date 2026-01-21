@@ -11,11 +11,12 @@
  *
  * 処理フロー:
  * 1. URLパラメータからエラーまたは認可コードを取得
- * 2. Cookieから state, nonce, code_verifier を取得
- * 3. openid-client の authorizationCodeGrant() でトークン交換・検証
- * 4. 検証成功: /callback.html?email=xxx&sub=xxx にリダイレクト
- * 5. 検証失敗: /error.html?error=エラーコード にリダイレクト
- * 6. Cookieをクリーンアップ
+ * 2. CookieからセッションIDを取得
+ * 3. DynamoDBからstate, nonce, code_verifierを取得
+ * 4. openid-client の authorizationCodeGrant() でトークン交換・検証
+ * 5. 検証成功: /callback.html?email=xxx&sub=xxx にリダイレクト
+ * 6. 検証失敗: /error.html?error=エラーコード にリダイレクト
+ * 7. セッションデータを削除（DynamoDB + Cookie）
  */
 import {
   APIGatewayProxyEventV2,
@@ -23,15 +24,20 @@ import {
 } from 'aws-lambda';
 import * as client from 'openid-client';
 
-import { COOKIE_NAMES, createDeleteOidcCookies, parseCookies } from '../utils/cookie';
+import {
+  createDeleteSessionCookie,
+  deleteSession,
+  getSession,
+  getSessionIdFromCookie,
+} from '../utils/session';
 
 /**
  * エラーコードの定義
  * フロントエンドの error.html で対応するメッセージを表示
  */
 const ERROR_CODES = {
-  /** Cookieが見つからない（期限切れまたは未設定） */
-  MISSING_COOKIE: 'missing_cookie',
+  /** セッションが見つからない（期限切れまたは未設定） */
+  MISSING_SESSION: 'missing_session',
   /** State不一致（CSRF攻撃の可能性） */
   STATE_MISMATCH: 'state_mismatch',
   /** Nonce不一致（リプレイ攻撃の可能性） */
@@ -107,15 +113,15 @@ async function getOidcConfig(): Promise<client.Configuration> {
  * @returns 302 リダイレクトレスポンス
  */
 function redirectToError(errorCode: string): APIGatewayProxyResultV2 {
-  // Cookieをクリーンアップ（セキュリティパラメータを削除）
-  const deleteCookies = createDeleteOidcCookies();
+  // セッションCookieを削除
+  const deleteSessionCookie = createDeleteSessionCookie();
 
   return {
     statusCode: 302,
     headers: {
       Location: `/error.html?error=${errorCode}`,
     },
-    cookies: deleteCookies,
+    cookies: [deleteSessionCookie],
     body: '',
   };
 }
@@ -128,15 +134,15 @@ function redirectToError(errorCode: string): APIGatewayProxyResultV2 {
  * @returns 302 リダイレクトレスポンス
  */
 function redirectToSuccess(email: string, sub: string): APIGatewayProxyResultV2 {
-  // Cookieをクリーンアップ（セキュリティパラメータを削除）
-  const deleteCookies = createDeleteOidcCookies();
+  // セッションCookieを削除
+  const deleteSessionCookie = createDeleteSessionCookie();
 
   return {
     statusCode: 302,
     headers: {
       Location: `/callback.html?email=${encodeURIComponent(email)}&sub=${encodeURIComponent(sub)}`,
     },
-    cookies: deleteCookies,
+    cookies: [deleteSessionCookie],
     body: '',
   };
 }
@@ -254,37 +260,60 @@ export const handler = async (
   }
 
   // ============================================================
-  // Step 2: Cookieからセキュリティパラメータを取得
+  // Step 2: CookieからセッションIDを取得
   // ============================================================
 
-  // Cookieヘッダーを解析
+  // Cookieヘッダーを解析してセッションIDを取得
   // HTTP API v2 では cookies 配列で送信される
   const cookieHeader = event.cookies?.join('; ') || '';
-  const cookies = parseCookies(cookieHeader);
+  const sessionId = getSessionIdFromCookie(cookieHeader);
 
-  const state = cookies[COOKIE_NAMES.STATE];
-  const nonce = cookies[COOKIE_NAMES.NONCE];
-  const codeVerifier = cookies[COOKIE_NAMES.CODE_VERIFIER];
-
-  console.log('Cookies retrieved', {
-    hasState: !!state,
-    hasNonce: !!nonce,
-    hasCodeVerifier: !!codeVerifier,
+  console.log('Session ID from cookie', {
+    hasSessionId: !!sessionId,
   });
 
-  // 必要なCookieが存在しない場合はエラー
-  // Cookieの期限切れ（10分）または、別のブラウザ/タブからのアクセスが考えられる
-  if (!state || !nonce || !codeVerifier) {
-    console.error('Missing required cookies', {
-      state: !!state,
-      nonce: !!nonce,
-      codeVerifier: !!codeVerifier,
-    });
-    return redirectToError(ERROR_CODES.MISSING_COOKIE);
+  // セッションIDが存在しない場合はエラー
+  if (!sessionId) {
+    console.error('Missing session ID in cookie');
+    return redirectToError(ERROR_CODES.MISSING_SESSION);
   }
 
   // ============================================================
-  // Step 3: OIDC Configuration の取得
+  // Step 3: DynamoDBからセキュリティパラメータを取得
+  // ============================================================
+
+  let state: string;
+  let nonce: string;
+  let codeVerifier: string;
+
+  try {
+    const sessionData = await getSession(sessionId);
+
+    // セッションが存在しない場合はエラー
+    // セッションの期限切れ（5分）または、別のブラウザ/タブからのアクセスが考えられる
+    if (!sessionData) {
+      console.error('Session not found in DynamoDB', {
+        sessionId: sessionId.substring(0, 8) + '...',
+      });
+      return redirectToError(ERROR_CODES.MISSING_SESSION);
+    }
+
+    state = sessionData.state;
+    nonce = sessionData.nonce;
+    codeVerifier = sessionData.codeVerifier;
+
+    console.log('Session data retrieved from DynamoDB', {
+      hasState: !!state,
+      hasNonce: !!nonce,
+      hasCodeVerifier: !!codeVerifier,
+    });
+  } catch (error) {
+    console.error('Failed to get session from DynamoDB', error);
+    return redirectToError(ERROR_CODES.MISSING_SESSION);
+  }
+
+  // ============================================================
+  // Step 4: OIDC Configuration の取得
   // ============================================================
 
   let config: client.Configuration;
@@ -296,7 +325,7 @@ export const handler = async (
   }
 
   // ============================================================
-  // Step 4: トークン交換と検証
+  // Step 5: トークン交換と検証
   // ============================================================
 
   try {
@@ -347,8 +376,16 @@ export const handler = async (
     });
 
     // ============================================================
-    // Step 5: 成功時のリダイレクト
+    // Step 6: セッションデータの削除と成功リダイレクト
     // ============================================================
+
+    // セッションデータをDynamoDBから削除（セキュリティのため即座に無効化）
+    try {
+      await deleteSession(sessionId);
+    } catch (deleteError) {
+      // 削除に失敗してもTTLで自動削除されるため、警告ログのみ
+      console.warn('Failed to delete session from DynamoDB', deleteError);
+    }
 
     const email = (claims.email as string) || '';
     const sub = claims.sub;
@@ -357,10 +394,17 @@ export const handler = async (
 
   } catch (error) {
     // ============================================================
-    // Step 6: エラー時のリダイレクト
+    // Step 7: エラー時のセッション削除とリダイレクト
     // ============================================================
 
     console.error('Token exchange failed', error);
+
+    // エラー時もセッションデータを削除（セキュリティのため）
+    try {
+      await deleteSession(sessionId);
+    } catch (deleteError) {
+      console.warn('Failed to delete session from DynamoDB on error', deleteError);
+    }
 
     const errorCode = getErrorCode(error);
     return redirectToError(errorCode);

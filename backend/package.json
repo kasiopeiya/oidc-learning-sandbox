@@ -9,6 +9,7 @@
     "lint:fix": "eslint src --ext .ts --fix"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.967.0",
     "openid-client": "^6.3.3"
   },
   "devDependencies": {

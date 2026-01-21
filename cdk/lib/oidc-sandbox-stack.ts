@@ -6,6 +6,7 @@ import { aws_apigatewayv2_integrations as integrations } from 'aws-cdk-lib';
 import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
 import { aws_cloudfront_origins as origins } from 'aws-cdk-lib';
 import { aws_cognito as cognito } from 'aws-cdk-lib';
+import { aws_dynamodb as dynamodb } from 'aws-cdk-lib';
 import { aws_lambda as lambda } from 'aws-cdk-lib';
 import { aws_lambda_nodejs as nodejs } from 'aws-cdk-lib';
 import { aws_s3 as s3 } from 'aws-cdk-lib';
@@ -44,6 +45,9 @@ export class OidcSandboxStack extends Stack {
 
   /** Callback Lambda関数 - トークン交換・検証 */
   public readonly callbackFunction: nodejs.NodejsFunction;
+
+  /** セッション管理用DynamoDBテーブル - State/Nonce/PKCE/アクセストークンを保存 */
+  public readonly sessionTable: dynamodb.Table;
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
@@ -119,6 +123,27 @@ export class OidcSandboxStack extends Stack {
       cognitoDomain: {
         domainPrefix: `${this.stackName.toLowerCase()}-${this.account}`,
       },
+    });
+
+    // ============================================================
+    // DynamoDBテーブル（セッション管理）
+    // ============================================================
+
+    // セッション管理用テーブルの作成
+    // - State/Nonce/PKCE/アクセストークンをセッションIDに紐付けて保存
+    // - TTL（Time To Live）で自動削除（5分）
+    this.sessionTable = new dynamodb.Table(this, 'SessionTable', {
+      // パーティションキー: セッションID
+      partitionKey: {
+        name: 'sessionId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      // オンデマンドキャパシティ（学習用途のため従量課金）
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      // TTL属性を有効化（ttl フィールドで自動削除）
+      timeToLiveAttribute: 'ttl',
+      // スタック削除時にテーブルも削除（学習用途のため）
+      removalPolicy: RemovalPolicy.DESTROY,
     });
 
     // ============================================================
@@ -295,6 +320,8 @@ export class OidcSandboxStack extends Stack {
         REDIRECT_URI: `https://${this.distribution.distributionDomainName}/api/auth/callback`,
         // フロントエンドの URL（CloudFront）
         FRONTEND_URL: `https://${this.distribution.distributionDomainName}`,
+        // セッション管理用DynamoDBテーブル名
+        SESSION_TABLE_NAME: this.sessionTable.tableName,
       },
       // esbuild によるバンドル設定
       bundling: {
@@ -348,5 +375,15 @@ export class OidcSandboxStack extends Stack {
         this.callbackFunction
       ),
     });
+
+    // ============================================================
+    // Lambda関数へのDynamoDB権限付与
+    // ============================================================
+
+    // Login関数: セッション作成（PutItem）
+    this.sessionTable.grantWriteData(this.loginFunction);
+
+    // Callback関数: セッション取得・削除（GetItem, DeleteItem）
+    this.sessionTable.grantReadWriteData(this.callbackFunction);
   }
 }

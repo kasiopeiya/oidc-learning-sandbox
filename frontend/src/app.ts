@@ -15,6 +15,7 @@
  * エラーコードと表示メッセージの対応表
  *
  * OIDC認証フローで発生する可能性のあるエラーを定義しています。
+ * - missing_session: セッションが見つからない（期限切れまたは未設定）
  * - state_mismatch: CSRF対策用のstateパラメータが一致しない
  * - nonce_mismatch: リプレイ攻撃対策用のnonceが一致しない
  * - missing_code: 認可コードがレスポンスに含まれていない
@@ -25,6 +26,7 @@
  * - network_error: OPサーバーとの通信エラー
  */
 const ERROR_MESSAGES: Record<string, string> = {
+  missing_session: 'セッションが見つかりません。もう一度お試しください。',
   state_mismatch: 'セッションが無効です。もう一度お試しください。',
   nonce_mismatch: 'セッションが無効です。もう一度お試しください。',
   missing_code: '認証情報が見つかりません。',
