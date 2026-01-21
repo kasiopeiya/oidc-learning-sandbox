@@ -19,6 +19,7 @@
 |---------------|----------|------|
 | `/api/auth/login` | GET | 認可リクエストURLを生成し、リダイレクト |
 | `/api/auth/callback` | GET | コールバック処理（トークン交換・検証） |
+| `/api/account` | POST | 口座作成（アクセストークンで保護されたAPI） |
 
 ---
 
@@ -80,13 +81,39 @@ sequenceDiagram
 
     Note right of L2: リプレイ攻撃の危険ポイント<br/>盗まれたIDトークンの再利用<br/>→ Nonce検証で防御
 
-    L2->>DDB: DeleteItem(sessionId)
+    L2->>DDB: PutItem(sessionId, accessToken, email, sub)
     DDB-->>L2: OK
 
-    L2-->>Browser: 302 Redirect + Cookie削除
-    Browser->>S3: GET /callback.html?email&sub
+    L2-->>Browser: 302 Redirect (Cookie維持)
+    Browser->>S3: GET /callback.html
     S3-->>Browser: callback.html
-    Browser->>User: ログイン完了画面を表示
+
+    Note over Browser: ページロード時に<br/>口座作成APIを自動呼び出し
+
+    participant L3 as 口座作成Lambda(RP)
+
+    Browser->>L3: POST /api/account
+    Note right of Browser: Cookie: oidc_session
+
+    L3->>DDB: GetItem(sessionId)
+    DDB-->>L3: accessToken, email, sub
+
+    L3->>OP: GET /oauth2/userInfo
+    Note right of L3: Bearer accessToken
+
+    Note over OP: 【検証】<br/>アクセストークンの有効性を検証
+
+    OP-->>L3: { sub, email }
+
+    Note over L3: 【口座番号生成】<br/>ダミーの10桁番号を生成
+
+    L3->>DDB: DeleteItem(sessionId)
+    DDB-->>L3: OK
+
+    L3-->>Browser: 200 OK + Cookie削除
+    Note left of L3: { accountNumber, email, sub }
+
+    Browser->>User: 口座番号を表示
 ```
 
 ### 2.2 異常系フロー（RP側の検証エラー）
@@ -213,7 +240,107 @@ sequenceDiagram
     Browser->>User: エラー画面を表示
 ```
 
-### 2.6 セキュリティパラメータ
+### 2.6 異常系フロー（口座作成API - トークン検証失敗）
+
+アクセストークンが無効な場合のフローです。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as ユーザー
+    participant Browser as ブラウザ
+    participant L3 as 口座作成Lambda(RP)
+    participant DDB as DynamoDB
+    participant OP as Cognito(OP)
+
+    Note over User,Browser: ※ 認証成功後、callback.htmlを表示
+
+    Browser->>L3: POST /api/account
+    Note right of Browser: Cookie: oidc_session
+
+    L3->>DDB: GetItem(sessionId)
+    DDB-->>L3: accessToken, email, sub
+
+    L3->>OP: GET /oauth2/userInfo
+    Note right of L3: Bearer accessToken
+
+    OP-->>L3: 401 Unauthorized
+    Note over OP: トークンが無効または期限切れ
+
+    Note over L3: 【検証失敗】<br/>UserInfoエンドポイントがエラーを返却
+
+    L3->>DDB: DeleteItem(sessionId)
+    DDB-->>L3: OK
+
+    L3-->>Browser: 401 + Cookie削除
+    Note left of L3: { error, code: "invalid_token" }
+
+    Browser->>User: エラーメッセージを表示
+```
+
+### 2.7 異常系フロー（口座作成API - セッションなし）
+
+セッションが見つからない場合のフローです。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as ユーザー
+    participant Browser as ブラウザ
+    participant L3 as 口座作成Lambda(RP)
+    participant DDB as DynamoDB
+
+    Note over User,Browser: ※ セッション期限切れ後にアクセス
+
+    Browser->>L3: POST /api/account
+    Note right of Browser: Cookie: oidc_session(期限切れ)
+
+    L3->>DDB: GetItem(sessionId)
+    DDB-->>L3: null (TTLで削除済み)
+
+    Note over L3: 【エラー検出】<br/>認証済みセッションが存在しない
+
+    L3-->>Browser: 401
+    Note left of L3: { error, code: "session_not_found" }
+
+    Browser->>User: エラーメッセージを表示
+```
+
+### 2.8 異常系フロー（口座作成API - 口座番号生成エラー）
+
+口座番号生成に失敗した場合のフローです。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as ユーザー
+    participant Browser as ブラウザ
+    participant L3 as 口座作成Lambda(RP)
+    participant DDB as DynamoDB
+    participant OP as Cognito(OP)
+
+    Browser->>L3: POST /api/account
+    Note right of Browser: Cookie: oidc_session
+
+    L3->>DDB: GetItem(sessionId)
+    DDB-->>L3: accessToken, email, sub
+
+    L3->>OP: GET /oauth2/userInfo
+    OP-->>L3: { sub, email }
+
+    Note over L3: 【口座番号生成】<br/>crypto.randomInt() を呼び出し
+
+    Note over L3: 【エラー発生】<br/>システムエントロピー不足などで<br/>乱数生成に失敗
+
+    L3-->>Browser: 500
+    Note left of L3: { error, code: "account_generation_error" }
+
+    Note over Browser: セッションは維持されるため<br/>リトライ可能
+
+    Browser->>User: エラーメッセージを表示
+```
+
+### 2.9 セキュリティパラメータ
 
 | パラメータ | 目的 | 防ぐ攻撃 | 保存場所 |
 |-----------|------|---------|----------|
@@ -222,7 +349,7 @@ sequenceDiagram
 | Nonce | IDトークンと認可リクエストの紐付け | リプレイ攻撃 | DynamoDB |
 | PKCE (code_verifier / code_challenge) | 認可コードの正当性証明 | 認可コード横取り攻撃 | DynamoDB |
 
-### 2.7 DynamoDB管理のメリット
+### 2.10 DynamoDB管理のメリット
 
 | 観点 | Cookie管理 | DynamoDB管理 |
 |------|-----------|--------------|
@@ -231,12 +358,14 @@ sequenceDiagram
 | TTL自動削除 | ❌ ブラウザ依存 | ✅ DynamoDB TTLで自動削除 |
 | 実装複雑度 | ✅ シンプル | △ DynamoDB操作が必要 |
 
-### 2.8 リダイレクト先一覧
+### 2.11 リダイレクト先一覧
 
 | 結果 | リダイレクト先 | 配置場所 |
 |------|---------------|---------|
-| 成功 | `/callback.html?email=xxx&sub=xxx` | S3 |
-| エラー | `/error.html?error=エラーコード` | S3 |
+| 認証成功 | `/callback.html` | S3 |
+| 認証エラー | `/error.html?error=エラーコード` | S3 |
+
+※ 認証成功後、callback.html から口座作成API（`/api/account`）が自動呼び出しされます。
 
 ---
 
@@ -278,9 +407,9 @@ Cognitoからのコールバックを処理し、トークン交換・検証を�
 2. Cookie から sessionId を取得
 3. DynamoDB から state, nonce, code_verifier を取得
 4. `openid-client` の `authorizationCodeGrant()` を呼び出し（内部で検証を実行）
-5. セッションデータを DynamoDB から削除
-6. 検証成功: 成功ページにリダイレクト
-7. 検証失敗: エラーページにリダイレクト
+5. アクセストークンを DynamoDB に保存（セッションIDで紐付け）
+6. 検証成功: /callback.html にリダイレクト（Cookie維持）
+7. 検証失敗: /error.html にリダイレクト
 
 #### エラー一覧
 
@@ -298,6 +427,53 @@ Cognitoからのコールバックを処理し、トークン交換・検証を�
 
 すべてのエラーは `/error.html?error=エラーコード` にリダイレクトされます。
 
+### 3.3 POST /api/account
+
+アクセストークンで保護されたAPIの実装例です。
+口座番号を生成して返却します。
+
+#### 処理フロー
+
+1. Cookie から sessionId を取得
+2. DynamoDB から accessToken, email, sub を取得
+3. Cognito UserInfo エンドポイントでトークン検証
+4. 口座番号（ダミー10桁）を生成
+5. セッションデータを DynamoDB から削除
+6. 口座情報を JSON で返却
+
+#### リクエスト
+
+```
+POST /api/account
+Cookie: oidc_session=xxx
+```
+
+#### レスポンス（成功時）
+
+```json
+{
+  "accountNumber": "1234567890",
+  "email": "user@example.com",
+  "sub": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+```
+
+#### エラー一覧
+
+| HTTPステータス | エラーコード | 原因 |
+|---------------|-------------|------|
+| 401 | `missing_session` | セッションIDがCookieに存在しない |
+| 401 | `session_not_found` | セッションがDynamoDBに存在しない |
+| 401 | `invalid_token` | アクセストークンが無効（UserInfo検証失敗） |
+| 500 | `session_error` | DynamoDB操作エラー |
+| 500 | `account_generation_error` | 口座番号生成エラー（エントロピー不足など） |
+
+#### セキュリティポイント
+
+- アクセストークンはブラウザに渡らない（DynamoDBで管理）
+- UserInfoエンドポイントでトークンの有効性を検証
+- 処理完了後にセッションを即座に削除（再利用防止）
+
 ---
 
 ## 4. 実装詳細
@@ -309,7 +485,8 @@ backend/
 ├── src/
 │   ├── handlers/
 │   │   ├── login.ts              # /api/auth/login ハンドラー
-│   │   └── callback.ts           # /api/auth/callback ハンドラー
+│   │   ├── callback.ts           # /api/auth/callback ハンドラー
+│   │   └── account.ts            # /api/account ハンドラー
 │   ├── utils/
 │   │   ├── cookie.ts             # Cookie操作ユーティリティ（未使用）
 │   │   ├── pkce.ts               # PKCE生成ユーティリティ
@@ -429,6 +606,10 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 ### 4.5 DynamoDBテーブル設計
 
+セッションテーブルは2種類のデータを保存します。
+
+#### 認可フロー中のセッション
+
 | 属性名 | 型 | 説明 |
 |--------|-----|------|
 | sessionId | String (PK) | セッションID（パーティションキー） |
@@ -437,8 +618,20 @@ export async function deleteSession(sessionId: string): Promise<void> {
 | codeVerifier | String | PKCE用パラメータ |
 | ttl | Number | TTL（UNIXタイムスタンプ） |
 
+#### 認証済みセッション
+
+| 属性名 | 型 | 説明 |
+|--------|-----|------|
+| sessionId | String (PK) | セッションID（パーティションキー） |
+| accessToken | String | アクセストークン（UserInfo呼び出し用） |
+| email | String | ユーザーのメールアドレス |
+| sub | String | ユーザーの一意識別子 |
+| authenticated | Boolean | 認証済みフラグ（true） |
+| ttl | Number | TTL（UNIXタイムスタンプ） |
+
 - **TTL**: 5分（300秒）
 - **課金モード**: オンデマンド（PAY_PER_REQUEST）
+- **備考**: 認可フロー完了時に認可フロー用データを認証済みデータで上書き
 
 ### 4.6 実装時の注意事項
 

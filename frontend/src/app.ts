@@ -83,32 +83,152 @@ function initIndexPage(): void {
 }
 
 /**
+ * 口座作成APIのレスポンス型
+ */
+interface AccountResponse {
+  /** 生成された口座番号 */
+  accountNumber: string;
+  /** ユーザーのメールアドレス */
+  email: string;
+  /** ユーザーの一意識別子 */
+  sub: string;
+}
+
+/**
+ * APIエラーレスポンス型
+ */
+interface ErrorResponse {
+  /** エラーメッセージ */
+  error: string;
+  /** エラーコード */
+  code: string;
+}
+
+/**
+ * 口座作成APIを呼び出す
+ *
+ * アクセストークンはDynamoDBに保存されており、CookieのセッションIDで紐付けられる。
+ * ブラウザにはアクセストークンが渡らないセキュアな実装。
+ *
+ * @returns 口座情報（成功時）またはエラー（失敗時）
+ */
+async function createAccount(): Promise<AccountResponse | ErrorResponse> {
+  // 口座作成APIを呼び出し
+  // CookieのセッションIDが自動的に送信される
+  const response = await fetch('/api/account', {
+    method: 'POST',
+    credentials: 'include', // Cookieを送信するために必要
+  });
+
+  // JSONレスポンスをパース
+  const data = await response.json();
+
+  // エラーレスポンスの場合
+  if (!response.ok) {
+    return data as ErrorResponse;
+  }
+
+  return data as AccountResponse;
+}
+
+/**
  * 認証成功画面（callback.html）の初期化
  *
- * バックエンドからリダイレクトされた際のクエリパラメータから
- * ユーザー情報（email, sub）を取得して画面に表示します。
+ * ページロード時に口座作成APIを自動呼び出しし、
+ * 口座番号とユーザー情報を画面に表示します。
  *
- * クエリパラメータ:
- * - email: ユーザーのメールアドレス（IDトークンのemail claimから取得）
- * - sub: ユーザーの一意識別子（IDトークンのsub claimから取得）
+ * フロー:
+ * 1. 口座作成API（/api/account）をPOSTで呼び出し
+ * 2. APIがCookieのセッションIDからアクセストークンを取得
+ * 3. UserInfoエンドポイントでトークンを検証
+ * 4. 口座番号を生成して返却
+ * 5. 画面に口座番号とユーザー情報を表示
  */
-function initCallbackPage(): void {
-  // クエリパラメータからユーザー情報を取得
-  const email = getQueryParam('email');
-  const sub = getQueryParam('sub');
-
+async function initCallbackPage(): Promise<void> {
   // 表示要素を取得
   const emailElement = document.getElementById('user-email');
   const subElement = document.getElementById('user-sub');
+  const accountStatusElement = document.getElementById('account-status');
+  const accountInfoElement = document.getElementById('account-info');
+  const accountNumberElement = document.getElementById('account-number');
+  const accountErrorElement = document.getElementById('account-error');
 
-  // メールアドレスを表示
-  if (emailElement) {
-    emailElement.textContent = email || '(未取得)';
-  }
+  try {
+    // 口座作成APIを呼び出し
+    const result = await createAccount();
 
-  // ユーザーIDを表示
-  if (subElement) {
-    subElement.textContent = sub || '(未取得)';
+    // エラーレスポンスの場合
+    if ('error' in result) {
+      console.error('Account creation failed', result);
+
+      // ローディング表示を非表示
+      if (accountStatusElement) {
+        accountStatusElement.style.display = 'none';
+      }
+
+      // エラーメッセージを表示
+      if (accountErrorElement) {
+        accountErrorElement.textContent = result.error;
+        accountErrorElement.style.display = 'block';
+      }
+
+      // ユーザー情報はエラー時も表示できない
+      if (emailElement) {
+        emailElement.textContent = '(取得失敗)';
+      }
+      if (subElement) {
+        subElement.textContent = '(取得失敗)';
+      }
+
+      return;
+    }
+
+    // 成功時: ユーザー情報を表示
+    if (emailElement) {
+      emailElement.textContent = result.email || '(未取得)';
+    }
+    if (subElement) {
+      subElement.textContent = result.sub || '(未取得)';
+    }
+
+    // ローディング表示を非表示
+    if (accountStatusElement) {
+      accountStatusElement.style.display = 'none';
+    }
+
+    // 口座情報を表示
+    if (accountInfoElement) {
+      accountInfoElement.style.display = 'block';
+    }
+    if (accountNumberElement) {
+      accountNumberElement.textContent = result.accountNumber;
+    }
+
+    console.log('Account created successfully', {
+      accountNumber: result.accountNumber.substring(0, 4) + '******',
+    });
+
+  } catch (error) {
+    console.error('Failed to call account API', error);
+
+    // ローディング表示を非表示
+    if (accountStatusElement) {
+      accountStatusElement.style.display = 'none';
+    }
+
+    // エラーメッセージを表示
+    if (accountErrorElement) {
+      accountErrorElement.textContent = '口座作成に失敗しました。もう一度お試しください。';
+      accountErrorElement.style.display = 'block';
+    }
+
+    // ユーザー情報はエラー時も表示できない
+    if (emailElement) {
+      emailElement.textContent = '(取得失敗)';
+    }
+    if (subElement) {
+      subElement.textContent = '(取得失敗)';
+    }
   }
 }
 

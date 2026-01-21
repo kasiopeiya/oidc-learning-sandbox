@@ -28,6 +28,20 @@ export interface SessionData {
   codeVerifier: string;
 }
 
+/**
+ * 認証済みセッションデータの型定義
+ *
+ * トークン交換後に保存されるアクセストークン情報
+ */
+export interface AuthenticatedSessionData {
+  /** Cognito UserInfoエンドポイント呼び出し用のアクセストークン */
+  accessToken: string;
+  /** ユーザーのメールアドレス（IDトークンから取得） */
+  email: string;
+  /** ユーザーの一意識別子（IDトークンから取得） */
+  sub: string;
+}
+
 /** DynamoDBクライアント（Lambda実行環境で再利用） */
 const dynamoClient = new DynamoDBClient({});
 
@@ -250,4 +264,119 @@ export function getSessionIdFromCookie(cookieHeader?: string): string | null {
   }
 
   return null;
+}
+
+/** 認証済みセッションの有効期限（秒）: 5分 */
+const AUTHENTICATED_SESSION_TTL_SECONDS = 300;
+
+/**
+ * 認証済みセッションデータ（アクセストークン）をDynamoDBに保存する
+ *
+ * トークン交換成功後に呼び出され、アクセストークンをセッションIDに紐付けて保存。
+ * これにより、アクセストークンがブラウザに渡らないセキュアな実装を実現する。
+ *
+ * @param sessionId - セッションID（パーティションキー）
+ * @param data - 認証済みセッションデータ（アクセストークン、ユーザー情報）
+ */
+export async function saveAuthenticatedSession(
+  sessionId: string,
+  data: AuthenticatedSessionData
+): Promise<void> {
+  const tableName = process.env.SESSION_TABLE_NAME;
+  if (!tableName) {
+    throw new Error('SESSION_TABLE_NAME environment variable is not set');
+  }
+
+  // TTL: 現在時刻 + 5分（UNIXタイムスタンプ、秒単位）
+  const ttl = Math.floor(Date.now() / 1000) + AUTHENTICATED_SESSION_TTL_SECONDS;
+
+  const command = new PutItemCommand({
+    TableName: tableName,
+    Item: {
+      // パーティションキー
+      sessionId: { S: sessionId },
+      // アクセストークン（UserInfo呼び出しに使用）
+      accessToken: { S: data.accessToken },
+      // ユーザー情報（フロントエンド表示用）
+      email: { S: data.email },
+      sub: { S: data.sub },
+      // 認証済みフラグ（認可フロー中のセッションと区別）
+      authenticated: { BOOL: true },
+      // TTL属性（DynamoDBが自動削除に使用）
+      ttl: { N: ttl.toString() },
+    },
+  });
+
+  await dynamoClient.send(command);
+
+  console.log('Authenticated session saved to DynamoDB', {
+    sessionId: sessionId.substring(0, 8) + '...',
+    ttlSeconds: AUTHENTICATED_SESSION_TTL_SECONDS,
+  });
+}
+
+/**
+ * 認証済みセッションデータ（アクセストークン）をDynamoDBから取得する
+ *
+ * 口座作成API呼び出し時に使用。セッションIDからアクセストークンを取得し、
+ * Cognito UserInfoエンドポイントでトークン検証を行う。
+ *
+ * @param sessionId - セッションID（パーティションキー）
+ * @returns 認証済みセッションデータ、存在しない場合はnull
+ */
+export async function getAuthenticatedSession(
+  sessionId: string
+): Promise<AuthenticatedSessionData | null> {
+  const tableName = process.env.SESSION_TABLE_NAME;
+  if (!tableName) {
+    throw new Error('SESSION_TABLE_NAME environment variable is not set');
+  }
+
+  const command = new GetItemCommand({
+    TableName: tableName,
+    Key: {
+      sessionId: { S: sessionId },
+    },
+  });
+
+  const result = await dynamoClient.send(command);
+
+  // アイテムが存在しない場合
+  if (!result.Item) {
+    console.log('Authenticated session not found', {
+      sessionId: sessionId.substring(0, 8) + '...',
+    });
+    return null;
+  }
+
+  // 認証済みセッションかどうかを確認
+  const authenticated = result.Item.authenticated?.BOOL;
+  if (!authenticated) {
+    console.log('Session is not authenticated', {
+      sessionId: sessionId.substring(0, 8) + '...',
+    });
+    return null;
+  }
+
+  // DynamoDBのAttributeValueからデータを抽出
+  const accessToken = result.Item.accessToken?.S;
+  const email = result.Item.email?.S;
+  const sub = result.Item.sub?.S;
+
+  // 必要なフィールドが存在しない場合
+  if (!accessToken || !email || !sub) {
+    console.error('Authenticated session data is incomplete', {
+      sessionId: sessionId.substring(0, 8) + '...',
+      hasAccessToken: !!accessToken,
+      hasEmail: !!email,
+      hasSub: !!sub,
+    });
+    return null;
+  }
+
+  console.log('Authenticated session retrieved from DynamoDB', {
+    sessionId: sessionId.substring(0, 8) + '...',
+  });
+
+  return { accessToken, email, sub };
 }

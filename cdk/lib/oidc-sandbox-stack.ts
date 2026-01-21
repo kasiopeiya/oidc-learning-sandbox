@@ -46,6 +46,9 @@ export class OidcSandboxStack extends Stack {
   /** Callback Lambda関数 - トークン交換・検証 */
   public readonly callbackFunction: nodejs.NodejsFunction;
 
+  /** Account Lambda関数 - 口座作成API */
+  public readonly accountFunction: nodejs.NodejsFunction;
+
   /** セッション管理用DynamoDBテーブル - State/Nonce/PKCE/アクセストークンを保存 */
   public readonly sessionTable: dynamodb.Table;
 
@@ -350,6 +353,17 @@ export class OidcSandboxStack extends Stack {
       description: 'OIDCコールバック処理（トークン交換・検証）',
     });
 
+    // Account Lambda関数
+    // - /api/account エンドポイントを処理
+    // - アクセストークンで保護されたAPIの実装例
+    // - Cognito UserInfoエンドポイントでトークンを検証
+    this.accountFunction = new nodejs.NodejsFunction(this, 'AccountFunction', {
+      ...lambdaCommonProps,
+      entry: path.join(__dirname, '../../backend/src/handlers/account.ts'),
+      handler: 'handler',
+      description: '口座作成API（アクセストークン検証）',
+    });
+
     // ============================================================
     // API Gateway ルート定義
     // ============================================================
@@ -376,6 +390,18 @@ export class OidcSandboxStack extends Stack {
       ),
     });
 
+    // /api/account ルート
+    // - POST メソッドで口座作成APIを呼び出し
+    // - アクセストークンで保護されたAPIの実装例
+    this.httpApi.addRoutes({
+      path: '/api/account',
+      methods: [apigw.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration(
+        'AccountIntegration',
+        this.accountFunction
+      ),
+    });
+
     // ============================================================
     // Lambda関数へのDynamoDB権限付与
     // ============================================================
@@ -383,7 +409,10 @@ export class OidcSandboxStack extends Stack {
     // Login関数: セッション作成（PutItem）
     this.sessionTable.grantWriteData(this.loginFunction);
 
-    // Callback関数: セッション取得・削除（GetItem, DeleteItem）
+    // Callback関数: セッション取得・削除・保存（GetItem, DeleteItem, PutItem）
     this.sessionTable.grantReadWriteData(this.callbackFunction);
+
+    // Account関数: セッション取得・削除（GetItem, DeleteItem）
+    this.sessionTable.grantReadWriteData(this.accountFunction);
   }
 }

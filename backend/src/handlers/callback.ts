@@ -25,10 +25,11 @@ import {
 import * as client from 'openid-client';
 
 import {
-  createDeleteSessionCookie,
+  createSessionCookie,
   deleteSession,
   getSession,
   getSessionIdFromCookie,
+  saveAuthenticatedSession,
 } from '../utils/session';
 
 /**
@@ -113,15 +114,11 @@ async function getOidcConfig(): Promise<client.Configuration> {
  * @returns 302 リダイレクトレスポンス
  */
 function redirectToError(errorCode: string): APIGatewayProxyResultV2 {
-  // セッションCookieを削除
-  const deleteSessionCookie = createDeleteSessionCookie();
-
   return {
     statusCode: 302,
     headers: {
       Location: `/error.html?error=${errorCode}`,
     },
-    cookies: [deleteSessionCookie],
     body: '',
   };
 }
@@ -129,20 +126,23 @@ function redirectToError(errorCode: string): APIGatewayProxyResultV2 {
 /**
  * 成功ページへのリダイレクトレスポンスを生成
  *
- * @param email - ユーザーのメールアドレス
- * @param sub - ユーザーの一意識別子
+ * トークン交換成功後、アクセストークンはDynamoDBに保存済みのため、
+ * クエリパラメータにはユーザー情報のみを含める。
+ * セッションIDのCookieは口座作成API呼び出しのために維持する。
+ *
+ * @param sessionId - セッションID（Cookie維持用）
  * @returns 302 リダイレクトレスポンス
  */
-function redirectToSuccess(email: string, sub: string): APIGatewayProxyResultV2 {
-  // セッションCookieを削除
-  const deleteSessionCookie = createDeleteSessionCookie();
+function redirectToSuccess(sessionId: string): APIGatewayProxyResultV2 {
+  // セッションCookieを再設定（口座作成API呼び出しのために維持）
+  const sessionCookie = createSessionCookie(sessionId);
 
   return {
     statusCode: 302,
     headers: {
-      Location: `/callback.html?email=${encodeURIComponent(email)}&sub=${encodeURIComponent(sub)}`,
+      Location: '/callback.html',
     },
-    cookies: [deleteSessionCookie],
+    cookies: [sessionCookie],
     body: '',
   };
 }
@@ -376,21 +376,35 @@ export const handler = async (
     });
 
     // ============================================================
-    // Step 6: セッションデータの削除と成功リダイレクト
+    // Step 6: アクセストークンをDynamoDBに保存して成功リダイレクト
     // ============================================================
 
-    // セッションデータをDynamoDBから削除（セキュリティのため即座に無効化）
-    try {
-      await deleteSession(sessionId);
-    } catch (deleteError) {
-      // 削除に失敗してもTTLで自動削除されるため、警告ログのみ
-      console.warn('Failed to delete session from DynamoDB', deleteError);
+    // アクセストークンを取得（UserInfoエンドポイント呼び出しに使用）
+    const accessToken = tokenResponse.access_token;
+    if (!accessToken) {
+      console.error('No access token in response');
+      return redirectToError(ERROR_CODES.AUTHENTICATION_FAILED);
     }
 
     const email = (claims.email as string) || '';
     const sub = claims.sub;
 
-    return redirectToSuccess(email, sub);
+    // 認証済みセッションデータをDynamoDBに保存（認可フロー用データを上書き）
+    // アクセストークンはブラウザに渡らず、DynamoDBで安全に管理される
+    try {
+      await saveAuthenticatedSession(sessionId, {
+        accessToken,
+        email,
+        sub,
+      });
+    } catch (saveError) {
+      console.error('Failed to save authenticated session', saveError);
+      return redirectToError(ERROR_CODES.AUTHENTICATION_FAILED);
+    }
+
+    console.log('Authentication successful, access token saved to DynamoDB');
+
+    return redirectToSuccess(sessionId);
 
   } catch (error) {
     // ============================================================
