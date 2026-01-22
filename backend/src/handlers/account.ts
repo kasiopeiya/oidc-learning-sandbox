@@ -64,12 +64,11 @@ interface ErrorResponse {
 async function verifyTokenWithUserInfo(
   accessToken: string
 ): Promise<{ sub: string; email: string } | null> {
-  const userPoolId = process.env.COGNITO_USER_POOL_ID!;
-  const region = userPoolId.split('_')[0]; // ap-northeast-1_XXXXX → ap-northeast-1
-
   // Cognito UserInfo エンドポイントのURL
-  // 形式: https://cognito-idp.{region}.amazonaws.com/{userPoolId}/oauth2/userInfo
-  const userInfoUrl = `https://cognito-idp.${region}.amazonaws.com/${userPoolId}/oauth2/userInfo`;
+  // 環境変数 COGNITO_DOMAIN はCDKで設定される
+  // 形式: https://<domain-prefix>.auth.<region>.amazoncognito.com
+  const cognitoDomain = process.env.COGNITO_DOMAIN!;
+  const userInfoUrl = `${cognitoDomain}/oauth2/userInfo`;
 
   console.log('Calling UserInfo endpoint', { userInfoUrl });
 

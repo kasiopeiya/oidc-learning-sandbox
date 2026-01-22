@@ -2,7 +2,7 @@
  * HTTPレベルE2Eテスト
  *
  * OIDC学習サンドボックスのHTTPレベルでの動作を検証する。
- * - 静的ファイル配信
+ * - 静的ファイル配信（React SPA）
  * - 認可エンドポイントリダイレクト
  * - OIDCセキュリティパラメータ
  */
@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('HTTP-001: トップページ表示', () => {
   /**
-   * CloudFrontからS3の静的ファイルが正しく配信されることを確認
+   * CloudFrontからReact SPAが正しく配信されることを確認
    */
   test('トップページが正しく表示される', async ({ page }) => {
     // トップページにアクセス
@@ -22,10 +22,9 @@ test.describe('HTTP-001: トップページ表示', () => {
     // タイトルの確認
     await expect(page).toHaveTitle('OIDC学習サンドボックス');
 
-    // ログインボタンの存在確認
-    const loginButton = page.locator('#login-button');
+    // ログインボタンの存在確認（テキストで検索）
+    const loginButton = page.getByRole('button', { name: '口座作成' });
     await expect(loginButton).toBeVisible();
-    await expect(loginButton).toHaveText('口座作成');
   });
 });
 
@@ -57,48 +56,67 @@ test.describe('HTTP-002: 認可エンドポイントリダイレクト', () => {
   });
 });
 
-test.describe('HTTP-003: 認証成功ページ表示', () => {
+test.describe('HTTP-003: 認証成功ページ表示（SPA）', () => {
   /**
-   * /callback.html が正しく配信されることを確認
+   * /callback がSPAとして正しく配信されることを確認
+   * CloudFrontのerrorResponsesによりindex.htmlが返され、
+   * React Routerが/callbackをルーティングする
    */
   test('認証成功ページが正しく表示される', async ({ page }) => {
-    // 認証成功ページにアクセス
-    const response = await page.goto('/callback.html');
+    // 認証成功ページにアクセス（SPAなので/callbackに直接アクセス）
+    const response = await page.goto('/callback');
 
-    // HTTPステータス 200 を確認
+    // HTTPステータス 200 を確認（CloudFrontのerrorResponsesによりindex.htmlが返される）
     expect(response?.status()).toBe(200);
 
-    // タイトルの確認
-    await expect(page).toHaveTitle(/認証成功/);
+    // React SPAがロードされ、CallbackPageコンポーネントが表示されるまで待機
+    // 「認証成功」テキストが表示されることを確認
+    await expect(page.getByText('認証成功')).toBeVisible();
 
     // 必須要素の存在確認
-    await expect(page.locator('text=認証成功')).toBeVisible();
-    await expect(page.locator('#user-email')).toBeAttached();
-    await expect(page.locator('#user-sub')).toBeAttached();
-    await expect(page.locator('text=メールアドレス')).toBeVisible();
-    await expect(page.locator('text=ユーザーID')).toBeVisible();
-    await expect(page.locator('text=トップへ戻る')).toBeVisible();
+    await expect(page.getByText('メールアドレス')).toBeVisible();
+    await expect(page.getByText('ユーザーID')).toBeVisible();
+    await expect(page.getByText('トップへ戻る')).toBeVisible();
+
+    // 口座情報セクションの存在確認
+    await expect(page.getByText('口座情報')).toBeVisible();
   });
 });
 
-test.describe('HTTP-004: エラーページ表示', () => {
+test.describe('HTTP-004: エラーページ表示（SPA）', () => {
   /**
-   * /error.html が正しく配信されることを確認
+   * /error がSPAとして正しく配信されることを確認
+   * CloudFrontのerrorResponsesによりindex.htmlが返され、
+   * React Routerが/errorをルーティングする
    */
   test('エラーページが正しく表示される', async ({ page }) => {
-    // エラーページにアクセス
-    const response = await page.goto('/error.html');
+    // エラーページにアクセス（SPAなので/errorに直接アクセス）
+    const response = await page.goto('/error?error=test_error');
 
-    // HTTPステータス 200 を確認
+    // HTTPステータス 200 を確認（CloudFrontのerrorResponsesによりindex.htmlが返される）
     expect(response?.status()).toBe(200);
 
-    // タイトルの確認
-    await expect(page).toHaveTitle(/エラー/);
+    // React SPAがロードされ、ErrorPageコンポーネントが表示されるまで待機
+    // 「エラー」テキストが表示されることを確認
+    await expect(page.getByRole('heading', { name: 'エラー' })).toBeVisible();
 
-    // 必須要素の存在確認
-    await expect(page.locator('text=エラー')).toBeVisible();
-    await expect(page.locator('#error-message')).toBeAttached();
-    await expect(page.locator('text=トップへ戻る')).toBeVisible();
+    // エラーメッセージが表示されることを確認
+    // デフォルトのエラーメッセージ（test_errorは定義されていないため）
+    await expect(page.getByText('認証に失敗しました')).toBeVisible();
+
+    // トップへ戻るリンクの存在確認
+    await expect(page.getByText('トップへ戻る')).toBeVisible();
+
+    // エラーコードの表示確認
+    await expect(page.getByText('エラーコード: test_error')).toBeVisible();
+  });
+
+  test('エラーコードに応じたメッセージが表示される', async ({ page }) => {
+    // access_deniedエラーでアクセス
+    await page.goto('/error?error=access_denied');
+
+    // 対応するエラーメッセージが表示されることを確認
+    await expect(page.getByText('認証がキャンセルされました')).toBeVisible();
   });
 });
 

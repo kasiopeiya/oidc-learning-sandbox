@@ -220,6 +220,22 @@ export class OidcSandboxStack extends Stack {
       defaultRootObject: 'index.html',
       // 価格クラス: 北米・欧州のみ（コスト削減）
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+      // SPA対応: 403/404エラー時にindex.htmlへフォールバック
+      // React Routerのクライアントサイドルーティングを有効にするために必要
+      // - /callback, /error などのパスに直接アクセスした場合、S3は404を返す
+      // - CloudFrontがこれをキャッチしてindex.htmlを返すことで、SPAが正しく動作する
+      errorResponses: [
+        {
+          httpStatus: 403,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+        },
+        {
+          httpStatus: 404,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+        },
+      ],
     });
 
     // ============================================================

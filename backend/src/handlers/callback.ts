@@ -14,8 +14,8 @@
  * 2. CookieからセッションIDを取得
  * 3. DynamoDBからstate, nonce, code_verifierを取得
  * 4. openid-client の authorizationCodeGrant() でトークン交換・検証
- * 5. 検証成功: /callback.html?email=xxx&sub=xxx にリダイレクト
- * 6. 検証失敗: /error.html?error=エラーコード にリダイレクト
+ * 5. 検証成功: /callback にリダイレクト
+ * 6. 検証失敗: /error?error=エラーコード にリダイレクト
  * 7. セッションデータを削除（DynamoDB + Cookie）
  */
 import {
@@ -34,7 +34,7 @@ import {
 
 /**
  * エラーコードの定義
- * フロントエンドの error.html で対応するメッセージを表示
+ * フロントエンドのErrorPageコンポーネントで対応するメッセージを表示
  */
 const ERROR_CODES = {
   /** セッションが見つからない（期限切れまたは未設定） */
@@ -117,7 +117,7 @@ function redirectToError(errorCode: string): APIGatewayProxyResultV2 {
   return {
     statusCode: 302,
     headers: {
-      Location: `/error.html?error=${errorCode}`,
+      Location: `/error?error=${errorCode}`,
     },
     body: '',
   };
@@ -140,7 +140,7 @@ function redirectToSuccess(sessionId: string): APIGatewayProxyResultV2 {
   return {
     statusCode: 302,
     headers: {
-      Location: '/callback.html',
+      Location: '/callback',
     },
     cookies: [sessionCookie],
     body: '',
@@ -221,7 +221,7 @@ function getErrorCode(error: unknown): string {
  * 6. 有効期限チェック - トークンの有効期限検証
  *
  * @param event - API Gateway HTTP API (v2) からのイベント
- * @returns 302 リダイレクトレスポンス（成功時: callback.html、失敗時: error.html）
+ * @returns 302 リダイレクトレスポンス（成功時: /callback、失敗時: /error）
  */
 export const handler = async (
   event: APIGatewayProxyEventV2

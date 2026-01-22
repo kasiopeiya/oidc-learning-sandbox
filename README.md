@@ -70,7 +70,8 @@ AWS CDKを用いて、IDプロバイダー（Cognito）とリライイングパ�
 | インフラ | AWS CDK |
 | 認証 (OP) | Amazon Cognito |
 | バックエンド (RP) | API Gateway (HTTP API) + Lambda |
-| フロントエンド | S3 + CloudFront |
+| フロントエンド | React 18 + Vite + Tailwind CSS + React Router |
+| ホスティング | S3 + CloudFront |
 
 ## 前提条件
 
@@ -151,15 +152,16 @@ OidcSandboxStack.CloudFrontURL = https://xxxxx.cloudfront.net
    - 確認コードがメールで届くので入力して認証を完了
 
 4. **認証成功画面の確認**
-   - 認証成功後、`/callback.html` にリダイレクトされる
+   - 認証成功後、`/callback` にリダイレクトされる
    - 「✓ 認証成功」と表示される
    - メールアドレスとユーザーID（sub）が表示されることを確認
+   - 口座番号が自動生成されて表示されることを確認
 
 ### 異常系: ログインキャンセル
 
 1. トップ画面から「口座作成」ボタンをクリック
 2. Cognito ログイン画面で「Back to <アプリ名>」リンクをクリック（または ブラウザの戻るボタン）
-3. `/error.html?error=access_denied` にリダイレクトされる
+3. `/error?error=access_denied` にリダイレクトされる
 4. 「認証がキャンセルされました。」というエラーメッセージが表示されることを確認
 
 ### 確認ポイント
@@ -168,8 +170,64 @@ OidcSandboxStack.CloudFrontURL = https://xxxxx.cloudfront.net
 |----------|----------|
 | トップ画面 → Cognito | 「口座作成」ボタンで認可エンドポイントにリダイレクト |
 | 新規ユーザー登録 | メール確認後にログイン可能 |
-| 認証成功画面 | メールアドレスとユーザーIDが表示される |
+| 認証成功画面 | メールアドレス、ユーザーID、口座番号が表示される |
 | ログインキャンセル | エラー画面に適切なメッセージが表示される |
+| SPA直接アクセス | `/callback`や`/error`に直接アクセスしてもSPAが正しく表示される |
+
+### 自動E2Eテスト（Playwright）
+
+Playwrightを使用した自動E2Eテストを実行できます。
+
+#### 前提条件
+
+- デプロイ済みのスタック（`npx cdk deploy` 完了済み）
+- jq コマンドがインストール済み
+- AWS CLI が設定済み
+
+#### テスト実行手順
+
+```bash
+# 1. integration-tests ディレクトリに移動
+cd integration-tests
+
+# 2. 依存関係のインストール（初回のみ）
+npm install
+
+# 3. Playwright ブラウザのインストール（初回のみ）
+npx playwright install
+
+# 4. 環境変数のロード（CDKスタックの出力値を取得）
+source scripts/load-env.sh
+
+# 5. テスト実行
+npm test
+
+# オプション: ブラウザを表示してテスト実行
+npm run test:headed
+
+# オプション: UIモードでテスト実行
+npm run test:ui
+```
+
+#### 環境変数
+
+`source scripts/load-env.sh` を実行すると、以下の環境変数が設定されます：
+
+| 環境変数 | 説明 |
+|----------|------|
+| `CLOUDFRONT_URL` | CloudFront ディストリビューションの URL |
+| `USER_POOL_ID` | Cognito User Pool ID |
+| `USER_POOL_CLIENT_ID` | Cognito User Pool Client ID |
+| `COGNITO_DOMAIN` | Cognito ドメイン |
+
+#### テスト結果
+
+テスト結果は `integration-tests/playwright-report/` に HTML レポートとして出力されます。
+
+```bash
+# レポートを表示
+npx playwright show-report
+```
 
 ## ディレクトリ構成
 
@@ -185,14 +243,28 @@ oidc-learning-sandbox/
 │   └── src/
 │       └── handlers/
 │           ├── login.ts    # 認可リクエスト生成
-│           └── callback.ts # コールバック処理
-├── frontend/               # フロントエンド（S3 配置）
-│   ├── public/
-│   │   ├── index.html      # トップ画面
-│   │   ├── callback.html   # 認証成功画面
-│   │   └── error.html      # エラー画面
+│           ├── callback.ts # コールバック処理
+│           └── account.ts  # 口座作成API
+├── frontend/               # フロントエンド（React SPA）
+│   ├── index.html          # Viteエントリポイント
+│   ├── vite.config.ts      # Vite設定
+│   ├── tailwind.config.js  # Tailwind CSS設定
 │   └── src/
-│       └── app.ts          # フロントエンドロジック
+│       ├── main.tsx        # Reactエントリポイント
+│       ├── App.tsx         # ルーティング設定
+│       ├── contexts/
+│       │   └── AuthContext.tsx  # 認証状態Context
+│       ├── pages/
+│       │   ├── IndexPage.tsx    # トップ画面
+│       │   ├── CallbackPage.tsx # 認証成功画面
+│       │   └── ErrorPage.tsx    # エラー画面
+│       └── utils/
+│           └── api.ts      # API呼び出しユーティリティ
+├── integration-tests/      # E2Eテスト（Playwright）
+│   ├── tests/              # テストファイル
+│   ├── scripts/
+│   │   └── load-env.sh     # 環境変数ロードスクリプト
+│   └── playwright.config.ts # Playwright設定
 ├── docs/                   # 設計書
 └── README.md
 ```

@@ -8,18 +8,18 @@
 
 バックエンドは **RP（Relying Party）** として機能します。
 
-| 用語 | 説明 | 今回の実装 |
-|------|------|------------|
-| OP（OpenID Provider） | 認証を行う側 | Amazon Cognito |
-| RP（Relying Party） | 認証を依頼する側 | Lambda関数 |
+| 用語                  | 説明             | 今回の実装     |
+| --------------------- | ---------------- | -------------- |
+| OP（OpenID Provider） | 認証を行う側     | Amazon Cognito |
+| RP（Relying Party）   | 認証を依頼する側 | Lambda関数     |
 
 ### 1.2 APIエンドポイント一覧
 
-| エンドポイント | メソッド | 説明 |
-|---------------|----------|------|
-| `/api/auth/login` | GET | 認可リクエストURLを生成し、リダイレクト |
-| `/api/auth/callback` | GET | コールバック処理（トークン交換・検証） |
-| `/api/account` | POST | 口座作成（アクセストークンで保護されたAPI） |
+| エンドポイント       | メソッド | 説明                                        |
+| -------------------- | -------- | ------------------------------------------- |
+| `/api/auth/login`    | GET      | 認可リクエストURLを生成し、リダイレクト     |
+| `/api/auth/callback` | GET      | コールバック処理（トークン交換・検証）      |
+| `/api/account`       | POST     | 口座作成（アクセストークンで保護されたAPI） |
 
 ---
 
@@ -36,6 +36,7 @@ sequenceDiagram
     participant DDB as DynamoDB
     participant OP as Cognito(OP)
     participant L2 as コールバックLambda(RP)
+    participant CF as CloudFront
     participant S3 as S3(静的ファイル)
 
     User->>Browser: 「口座作成」ボタンをクリック
@@ -84,11 +85,16 @@ sequenceDiagram
     L2->>DDB: PutItem(sessionId, accessToken, email, sub)
     DDB-->>L2: OK
 
-    L2-->>Browser: 302 Redirect (Cookie維持)
-    Browser->>S3: GET /callback.html
-    S3-->>Browser: callback.html
+    L2-->>Browser: 302 Redirect to /callback (Cookie維持)
+    Browser->>CF: GET /callback
+    CF->>S3: GET /callback
+    S3-->>CF: 404 Not Found
+    Note over CF: 【SPA対応】<br/>404エラーをindex.htmlで<br/>フォールバック
+    CF->>S3: GET /index.html
+    S3-->>CF: index.html
+    CF-->>Browser: 200 OK + index.html
 
-    Note over Browser: ページロード時に<br/>口座作成APIを自動呼び出し
+    Note over Browser: 【React SPA起動】<br/>React RouterがURL(/callback)を解析<br/>→ CallbackPageコンポーネントを表示<br/>→ 口座作成APIを自動呼び出し
 
     participant L3 as 口座作成Lambda(RP)
 
@@ -127,6 +133,7 @@ sequenceDiagram
     participant Browser as ブラウザ
     participant L2 as コールバックLambda(RP)
     participant DDB as DynamoDB
+    participant CF as CloudFront
     participant S3 as S3(静的ファイル)
 
     Note over User,Browser: ※ 認可フロー完了後、コールバックを受信
@@ -142,11 +149,16 @@ sequenceDiagram
     L2->>DDB: DeleteItem(sessionId)
     DDB-->>L2: OK
 
-    L2-->>Browser: 302 Redirect + Cookie削除
-    Browser->>S3: GET /error.html?error=state_mismatch
-    S3-->>Browser: error.html
+    L2-->>Browser: 302 Redirect to /error?error=state_mismatch + Cookie削除
+    Browser->>CF: GET /error?error=state_mismatch
+    CF->>S3: GET /error
+    S3-->>CF: 404 Not Found
+    Note over CF: 【SPA対応】<br/>404エラーをindex.htmlで<br/>フォールバック
+    CF->>S3: GET /index.html
+    S3-->>CF: index.html
+    CF-->>Browser: 200 OK + index.html
 
-    Note over Browser: クエリパラメータからエラー種別を取得し、<br/>対応するエラーメッセージを表示
+    Note over Browser: 【React SPA起動】<br/>React RouterがURL(/error)を解析<br/>→ ErrorPageコンポーネントを表示<br/>→ クエリパラメータからエラー種別を取得
 
     Browser->>User: エラー画面を表示
 ```
@@ -162,6 +174,7 @@ sequenceDiagram
     participant Browser as ブラウザ
     participant L2 as コールバックLambda(RP)
     participant DDB as DynamoDB
+    participant CF as CloudFront
     participant S3 as S3(静的ファイル)
 
     Browser->>L2: GET /callback?code&state
@@ -172,9 +185,15 @@ sequenceDiagram
 
     Note over L2: 【エラー検出】<br/>セッションが存在しない<br/>（5分経過でTTLにより自動削除）
 
-    L2-->>Browser: 302 Redirect + Cookie削除
-    Browser->>S3: GET /error.html?error=missing_session
-    S3-->>Browser: error.html
+    L2-->>Browser: 302 Redirect to /error?error=missing_session + Cookie削除
+    Browser->>CF: GET /error?error=missing_session
+    CF->>S3: GET /error
+    S3-->>CF: 404 Not Found
+    Note over CF: 【SPA対応】<br/>index.htmlでフォールバック
+    CF->>S3: GET /index.html
+    S3-->>CF: index.html
+    CF-->>Browser: 200 OK + index.html
+    Note over Browser: React Router → ErrorPage表示
     Browser->>User: エラー画面を表示
 ```
 
@@ -189,6 +208,7 @@ sequenceDiagram
     participant Browser as ブラウザ
     participant OP as Cognito(OP)
     participant L2 as コールバックLambda(RP)
+    participant CF as CloudFront
     participant S3 as S3(静的ファイル)
 
     Note over User,OP: ※ ユーザーがログイン画面でキャンセルした場合
@@ -199,9 +219,15 @@ sequenceDiagram
 
     Note over L2: 【エラー検出】<br/>URLにerrorパラメータが存在<br/>→ 認可コードなし
 
-    L2-->>Browser: 302 Redirect + Cookie削除
-    Browser->>S3: GET /error.html?error=access_denied
-    S3-->>Browser: error.html
+    L2-->>Browser: 302 Redirect to /error?error=access_denied + Cookie削除
+    Browser->>CF: GET /error?error=access_denied
+    CF->>S3: GET /error
+    S3-->>CF: 404 Not Found
+    Note over CF: 【SPA対応】<br/>index.htmlでフォールバック
+    CF->>S3: GET /index.html
+    S3-->>CF: index.html
+    CF-->>Browser: 200 OK + index.html
+    Note over Browser: React Router → ErrorPage表示
     Browser->>User: エラー画面を表示
 ```
 
@@ -217,6 +243,7 @@ sequenceDiagram
     participant L2 as コールバックLambda(RP)
     participant DDB as DynamoDB
     participant OP as Cognito(OP)
+    participant CF as CloudFront
     participant S3 as S3(静的ファイル)
 
     Browser->>L2: GET /callback?code&state
@@ -234,9 +261,15 @@ sequenceDiagram
     L2->>DDB: DeleteItem(sessionId)
     DDB-->>L2: OK
 
-    L2-->>Browser: 302 Redirect + Cookie削除
-    Browser->>S3: GET /error.html?error=network_error
-    S3-->>Browser: error.html
+    L2-->>Browser: 302 Redirect to /error?error=network_error + Cookie削除
+    Browser->>CF: GET /error?error=network_error
+    CF->>S3: GET /error
+    S3-->>CF: 404 Not Found
+    Note over CF: 【SPA対応】<br/>index.htmlでフォールバック
+    CF->>S3: GET /index.html
+    S3-->>CF: index.html
+    CF-->>Browser: 200 OK + index.html
+    Note over Browser: React Router → ErrorPage表示
     Browser->>User: エラー画面を表示
 ```
 
@@ -342,28 +375,28 @@ sequenceDiagram
 
 ### 2.9 セキュリティパラメータ
 
-| パラメータ | 目的 | 防ぐ攻撃 | 保存場所 |
-|-----------|------|---------|----------|
-| SessionID | セッション識別 | - | Cookie |
-| State | 認可リクエストとコールバックの紐付け | CSRF攻撃 | DynamoDB |
-| Nonce | IDトークンと認可リクエストの紐付け | リプレイ攻撃 | DynamoDB |
-| PKCE (code_verifier / code_challenge) | 認可コードの正当性証明 | 認可コード横取り攻撃 | DynamoDB |
+| パラメータ                            | 目的                                 | 防ぐ攻撃             | 保存場所 |
+| ------------------------------------- | ------------------------------------ | -------------------- | -------- |
+| SessionID                             | セッション識別                       | -                    | Cookie   |
+| State                                 | 認可リクエストとコールバックの紐付け | CSRF攻撃             | DynamoDB |
+| Nonce                                 | IDトークンと認可リクエストの紐付け   | リプレイ攻撃         | DynamoDB |
+| PKCE (code_verifier / code_challenge) | 認可コードの正当性証明               | 認可コード横取り攻撃 | DynamoDB |
 
 ### 2.10 DynamoDB管理のメリット
 
-| 観点 | Cookie管理 | DynamoDB管理 |
-|------|-----------|--------------|
-| XSS耐性 | △ HttpOnlyで軽減 | ✅ パラメータがブラウザに渡らない |
-| セッション無効化 | △ 有効期限まで有効 | ✅ 即座に削除可能 |
-| TTL自動削除 | ❌ ブラウザ依存 | ✅ DynamoDB TTLで自動削除 |
-| 実装複雑度 | ✅ シンプル | △ DynamoDB操作が必要 |
+| 観点             | Cookie管理         | DynamoDB管理                      |
+| ---------------- | ------------------ | --------------------------------- |
+| XSS耐性          | △ HttpOnlyで軽減   | ✅ パラメータがブラウザに渡らない |
+| セッション無効化 | △ 有効期限まで有効 | ✅ 即座に削除可能                 |
+| TTL自動削除      | ❌ ブラウザ依存    | ✅ DynamoDB TTLで自動削除         |
+| 実装複雑度       | ✅ シンプル        | △ DynamoDB操作が必要              |
 
 ### 2.11 リダイレクト先一覧
 
-| 結果 | リダイレクト先 | 配置場所 |
-|------|---------------|---------|
-| 認証成功 | `/callback.html` | S3 |
-| 認証エラー | `/error.html?error=エラーコード` | S3 |
+| 結果       | リダイレクト先              | 配置場所 |
+| ---------- | --------------------------- | -------- |
+| 認証成功   | `/callback`                 | S3       |
+| 認証エラー | `/error?error=エラーコード` | S3       |
 
 ※ 認証成功後、callback.html から口座作成API（`/api/account`）が自動呼び出しされます。
 
@@ -408,24 +441,24 @@ Cognitoからのコールバックを処理し、トークン交換・検証を�
 3. DynamoDB から state, nonce, code_verifier を取得
 4. `openid-client` の `authorizationCodeGrant()` を呼び出し（内部で検証を実行）
 5. アクセストークンを DynamoDB に保存（セッションIDで紐付け）
-6. 検証成功: /callback.html にリダイレクト（Cookie維持）
-7. 検証失敗: /error.html にリダイレクト
+6. 検証成功: /callback にリダイレクト（Cookie維持）
+7. 検証失敗: /error にリダイレクト
 
 #### エラー一覧
 
-| エラー種別 | 原因 | エラーコード |
-|-----------|------|-------------|
-| セッションなし | セッションが見つからない（期限切れ、未設定） | `missing_session` |
-| state不一致 | CSRF攻撃の可能性 | `state_mismatch` |
-| nonce不一致 | リプレイ攻撃の可能性 | `nonce_mismatch` |
-| 認可コードなし | URLに認可コードが含まれていない | `missing_code` |
-| ユーザーキャンセル | ユーザーがログイン画面でキャンセル | `access_denied` |
-| OPエラー | Cognitoが認可コードを拒否（無効、期限切れ等） | `op_error` |
-| 署名検証失敗 | IDトークンが改ざんされている可能性 | `invalid_signature` |
-| 有効期限切れ | IDトークンの有効期限が過ぎている | `token_expired` |
-| ネットワークエラー | Cognitoへの通信に失敗 | `network_error` |
+| エラー種別         | 原因                                          | エラーコード        |
+| ------------------ | --------------------------------------------- | ------------------- |
+| セッションなし     | セッションが見つからない（期限切れ、未設定）  | `missing_session`   |
+| state不一致        | CSRF攻撃の可能性                              | `state_mismatch`    |
+| nonce不一致        | リプレイ攻撃の可能性                          | `nonce_mismatch`    |
+| 認可コードなし     | URLに認可コードが含まれていない               | `missing_code`      |
+| ユーザーキャンセル | ユーザーがログイン画面でキャンセル            | `access_denied`     |
+| OPエラー           | Cognitoが認可コードを拒否（無効、期限切れ等） | `op_error`          |
+| 署名検証失敗       | IDトークンが改ざんされている可能性            | `invalid_signature` |
+| 有効期限切れ       | IDトークンの有効期限が過ぎている              | `token_expired`     |
+| ネットワークエラー | Cognitoへの通信に失敗                         | `network_error`     |
 
-すべてのエラーは `/error.html?error=エラーコード` にリダイレクトされます。
+すべてのエラーは `/error?error=エラーコード` にリダイレクトされます。
 
 ### 3.3 POST /api/account
 
@@ -460,13 +493,13 @@ Cookie: oidc_session=xxx
 
 #### エラー一覧
 
-| HTTPステータス | エラーコード | 原因 |
-|---------------|-------------|------|
-| 401 | `missing_session` | セッションIDがCookieに存在しない |
-| 401 | `session_not_found` | セッションがDynamoDBに存在しない |
-| 401 | `invalid_token` | アクセストークンが無効（UserInfo検証失敗） |
-| 500 | `session_error` | DynamoDB操作エラー |
-| 500 | `account_generation_error` | 口座番号生成エラー（エントロピー不足など） |
+| HTTPステータス | エラーコード               | 原因                                       |
+| -------------- | -------------------------- | ------------------------------------------ |
+| 401            | `missing_session`          | セッションIDがCookieに存在しない           |
+| 401            | `session_not_found`        | セッションがDynamoDBに存在しない           |
+| 401            | `invalid_token`            | アクセストークンが無効（UserInfo検証失敗） |
+| 500            | `session_error`            | DynamoDB操作エラー                         |
+| 500            | `account_generation_error` | 口座番号生成エラー（エントロピー不足など） |
 
 #### セキュリティポイント
 
@@ -499,110 +532,113 @@ backend/
 
 ### 4.2 使用ライブラリ
 
-| ライブラリ | 用途 |
-|-----------|------|
-| openid-client | OIDC認証フロー全体（Discovery、トークン交換、検証） |
-| @aws-sdk/client-dynamodb | DynamoDBへのセッションデータ保存・取得・削除 |
+| ライブラリ               | 用途                                                |
+| ------------------------ | --------------------------------------------------- |
+| openid-client            | OIDC認証フロー全体（Discovery、トークン交換、検証） |
+| @aws-sdk/client-dynamodb | DynamoDBへのセッションデータ保存・取得・削除        |
 
 #### ライブラリ選定理由
 
-| 比較項目 | openid-client | jose + 手動実装 |
-|----------|---------------|-----------------|
-| 実装の手軽さ | ✅ 簡単 | ❌ 手間がかかる |
-| セキュリティ | ✅ ベストプラクティス組み込み | △ 自分で注意が必要 |
-| 学習効果 | △ 内部が隠蔽される | ✅ 各ステップを理解できる |
+| 比較項目     | openid-client                 | jose + 手動実装           |
+| ------------ | ----------------------------- | ------------------------- |
+| 実装の手軽さ | ✅ 簡単                       | ❌ 手間がかかる           |
+| セキュリティ | ✅ ベストプラクティス組み込み | △ 自分で注意が必要        |
+| 学習効果     | △ 内部が隠蔽される            | ✅ 各ステップを理解できる |
 
 今回は `openid-client` を採用し、ブラックボックス化される処理はコメントで解説します。
 
 ### 4.3 セッション管理（session.ts）
 
 ```typescript
-import * as crypto from 'crypto';
+import * as crypto from 'crypto'
 import {
   DynamoDBClient,
   PutItemCommand,
   GetItemCommand,
-  DeleteItemCommand,
-} from '@aws-sdk/client-dynamodb';
+  DeleteItemCommand
+} from '@aws-sdk/client-dynamodb'
 
 export interface SessionData {
-  state: string;
-  nonce: string;
-  codeVerifier: string;
+  state: string
+  nonce: string
+  codeVerifier: string
 }
 
-const dynamoClient = new DynamoDBClient({});
-const SESSION_TTL_SECONDS = 300; // 5分
+const dynamoClient = new DynamoDBClient({})
+const SESSION_TTL_SECONDS = 300 // 5分
 
 /**
  * セッションIDを生成
  * 256ビットのランダム文字列（Base64URL）
  */
 export function generateSessionId(): string {
-  return crypto.randomBytes(32).toString('base64url');
+  return crypto.randomBytes(32).toString('base64url')
 }
 
 /**
  * セッションをDynamoDBに保存
  */
-export async function saveSession(
-  sessionId: string,
-  data: SessionData
-): Promise<void> {
-  const ttl = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+export async function saveSession(sessionId: string, data: SessionData): Promise<void> {
+  const ttl = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
 
-  await dynamoClient.send(new PutItemCommand({
-    TableName: process.env.SESSION_TABLE_NAME,
-    Item: {
-      sessionId: { S: sessionId },
-      state: { S: data.state },
-      nonce: { S: data.nonce },
-      codeVerifier: { S: data.codeVerifier },
-      ttl: { N: ttl.toString() },
-    },
-  }));
+  await dynamoClient.send(
+    new PutItemCommand({
+      TableName: process.env.SESSION_TABLE_NAME,
+      Item: {
+        sessionId: { S: sessionId },
+        state: { S: data.state },
+        nonce: { S: data.nonce },
+        codeVerifier: { S: data.codeVerifier },
+        ttl: { N: ttl.toString() }
+      }
+    })
+  )
 }
 
 /**
  * セッションをDynamoDBから取得
  */
 export async function getSession(sessionId: string): Promise<SessionData | null> {
-  const result = await dynamoClient.send(new GetItemCommand({
-    TableName: process.env.SESSION_TABLE_NAME,
-    Key: { sessionId: { S: sessionId } },
-  }));
+  const result = await dynamoClient.send(
+    new GetItemCommand({
+      TableName: process.env.SESSION_TABLE_NAME,
+      Key: { sessionId: { S: sessionId } }
+    })
+  )
 
-  if (!result.Item) return null;
+  if (!result.Item) return null
 
   return {
     state: result.Item.state?.S || '',
     nonce: result.Item.nonce?.S || '',
-    codeVerifier: result.Item.codeVerifier?.S || '',
-  };
+    codeVerifier: result.Item.codeVerifier?.S || ''
+  }
 }
 
 /**
  * セッションをDynamoDBから削除
  */
 export async function deleteSession(sessionId: string): Promise<void> {
-  await dynamoClient.send(new DeleteItemCommand({
-    TableName: process.env.SESSION_TABLE_NAME,
-    Key: { sessionId: { S: sessionId } },
-  }));
+  await dynamoClient.send(
+    new DeleteItemCommand({
+      TableName: process.env.SESSION_TABLE_NAME,
+      Key: { sessionId: { S: sessionId } }
+    })
+  )
 }
 ```
 
 ### 4.4 環境変数
 
-| 変数名 | 説明 |
-|--------|------|
-| COGNITO_USER_POOL_ID | Cognito User Pool ID |
-| COGNITO_CLIENT_ID | OIDCクライアントID |
+| 変数名                | 説明                         |
+| --------------------- | ---------------------------- |
+| COGNITO_USER_POOL_ID  | Cognito User Pool ID         |
+| COGNITO_CLIENT_ID     | OIDCクライアントID           |
 | COGNITO_CLIENT_SECRET | OIDCクライアントシークレット |
-| COGNITO_DOMAIN | Cognitoドメイン（ホストUI） |
-| REDIRECT_URI | 認証後のリダイレクトURI |
-| FRONTEND_URL | フロントエンドのURL |
-| SESSION_TABLE_NAME | DynamoDBテーブル名 |
+| COGNITO_DOMAIN        | Cognitoドメイン（ホストUI）  |
+| REDIRECT_URI          | 認証後のリダイレクトURI      |
+| FRONTEND_URL          | フロントエンドのURL          |
+| SESSION_TABLE_NAME    | DynamoDBテーブル名           |
 
 ### 4.5 DynamoDBテーブル設計
 
@@ -610,24 +646,24 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 #### 認可フロー中のセッション
 
-| 属性名 | 型 | 説明 |
-|--------|-----|------|
-| sessionId | String (PK) | セッションID（パーティションキー） |
-| state | String | CSRF対策用パラメータ |
-| nonce | String | リプレイ攻撃対策用パラメータ |
-| codeVerifier | String | PKCE用パラメータ |
-| ttl | Number | TTL（UNIXタイムスタンプ） |
+| 属性名       | 型          | 説明                               |
+| ------------ | ----------- | ---------------------------------- |
+| sessionId    | String (PK) | セッションID（パーティションキー） |
+| state        | String      | CSRF対策用パラメータ               |
+| nonce        | String      | リプレイ攻撃対策用パラメータ       |
+| codeVerifier | String      | PKCE用パラメータ                   |
+| ttl          | Number      | TTL（UNIXタイムスタンプ）          |
 
 #### 認証済みセッション
 
-| 属性名 | 型 | 説明 |
-|--------|-----|------|
-| sessionId | String (PK) | セッションID（パーティションキー） |
-| accessToken | String | アクセストークン（UserInfo呼び出し用） |
-| email | String | ユーザーのメールアドレス |
-| sub | String | ユーザーの一意識別子 |
-| authenticated | Boolean | 認証済みフラグ（true） |
-| ttl | Number | TTL（UNIXタイムスタンプ） |
+| 属性名        | 型          | 説明                                   |
+| ------------- | ----------- | -------------------------------------- |
+| sessionId     | String (PK) | セッションID（パーティションキー）     |
+| accessToken   | String      | アクセストークン（UserInfo呼び出し用） |
+| email         | String      | ユーザーのメールアドレス               |
+| sub           | String      | ユーザーの一意識別子                   |
+| authenticated | Boolean     | 認証済みフラグ（true）                 |
+| ttl           | Number      | TTL（UNIXタイムスタンプ）              |
 
 - **TTL**: 5分（300秒）
 - **課金モード**: オンデマンド（PAY_PER_REQUEST）
@@ -639,11 +675,11 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 OPに登録したURLと、コードで指定する `redirect_uri` は **完全一致** が必要です。
 
-| NG例 | 理由 |
-|------|------|
+| NG例                                                              | 理由                 |
+| ----------------------------------------------------------------- | -------------------- |
 | `https://example.com/callback` vs `https://example.com/callback/` | 末尾スラッシュの有無 |
-| `https://example.com/callback` vs `https://Example.com/callback` | 大文字小文字の違い |
-| `http://...` vs `https://...` | スキームの違い |
+| `https://example.com/callback` vs `https://Example.com/callback`  | 大文字小文字の違い   |
+| `http://...` vs `https://...`                                     | スキームの違い       |
 
 **対策**: CDKで生成したCloudFrontのURLを環境変数として渡し、Cognito App Client の設定と Lambda の両方で同じ値を参照するようにします。
 
@@ -674,18 +710,18 @@ DynamoDBのTTLは即座に削除されるわけではありません（最大48�
 
 ### 5.1 実装するセキュリティ対策
 
-| 対策 | 実装方法 |
-|------|---------|
-| State / Nonce / PKCE / 署名検証 | `openid-client` が自動実行 |
-| HttpOnly / Secure / SameSite Cookie | 手動実装（セッションID用Cookie） |
-| セッションデータのサーバーサイド管理 | DynamoDB |
-| セッションの即座無効化 | 認証完了後にDeleteItem |
-| セッションの自動削除 | DynamoDB TTL（5分） |
+| 対策                                 | 実装方法                         |
+| ------------------------------------ | -------------------------------- |
+| State / Nonce / PKCE / 署名検証      | `openid-client` が自動実行       |
+| HttpOnly / Secure / SameSite Cookie  | 手動実装（セッションID用Cookie） |
+| セッションデータのサーバーサイド管理 | DynamoDB                         |
+| セッションの即座無効化               | 認証完了後にDeleteItem           |
+| セッションの自動削除                 | DynamoDB TTL（5分）              |
 
 ### 5.2 学習用途のため簡略化した項目
 
-| 項目 | 本番環境での推奨 | 今回の対応 |
-|------|------------------|------------|
+| 項目                     | 本番環境での推奨       | 今回の対応     |
+| ------------------------ | ---------------------- | -------------- |
 | クライアントシークレット | Secrets Manager で管理 | 環境変数で保持 |
-| Rate Limiting | API Gatewayで制限 | なし |
-| WAF | 有効化 | なし |
+| Rate Limiting            | API Gatewayで制限      | なし           |
+| WAF                      | 有効化                 | なし           |
