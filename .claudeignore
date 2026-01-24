@@ -1,0 +1,6 @@
+# 初期構築用ドキュメント（参照不要）
+docs/implementation-plan.md
+docs/project-structure.md
+
+# プロンプト関連
+prompt/
