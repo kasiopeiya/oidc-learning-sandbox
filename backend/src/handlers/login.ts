@@ -2,7 +2,7 @@
  * /api/auth/login ハンドラー
  *
  * OIDC認可コードフローの開始点。
- * 認可リクエストURLを生成し、Cognito（OP）にリダイレクトする。
+ * 認可リクエストURLを生成し、OP（OpenID Provider）にリダイレクトする。
  *
  * 処理フロー:
  * 1. セッションIDを生成（暗号論的に安全なランダム文字列）
@@ -10,7 +10,8 @@
  * 3. code_challenge を計算（SHA256 + Base64URL）
  * 4. セッションIDをキーにして、state/nonce/code_verifier を DynamoDB に保存
  * 5. セッションIDを HttpOnly, Secure, SameSite=Lax の Cookie に保存
- * 6. 認可URLを構築して302リダイレクト
+ * 6. OIDC Discovery から認可エンドポイントを取得
+ * 7. 認可URLを構築して302リダイレクト
  *
  * セキュリティパラメータの役割:
  * - state: CSRF攻撃対策 - 認可リクエストとコールバックの紐付け
@@ -27,6 +28,7 @@ import {
   APIGatewayProxyResultV2,
 } from 'aws-lambda';
 
+import { getAuthorizationEndpoint, getOidcEnvVars } from '../utils/oidc-config';
 import { generateOidcSecurityParams } from '../utils/pkce';
 import {
   createSessionCookie,
@@ -47,10 +49,10 @@ const OAUTH_SCOPES = 'openid email profile';
  * ログインエンドポイントのハンドラー
  *
  * ブラウザから /api/auth/login にアクセスすると、
- * Cognito（OP）の認可エンドポイントにリダイレクトされる。
+ * OP（OpenID Provider）の認可エンドポイントにリダイレクトされる。
  *
  * @param event - API Gateway HTTP API (v2) からのイベント
- * @returns 302 リダイレクトレスポンス（Cognito 認可エンドポイントへ）
+ * @returns 302 リダイレクトレスポンス（OP 認可エンドポイントへ）
  */
 export const handler = async (
   event: APIGatewayProxyEventV2
@@ -101,22 +103,24 @@ export const handler = async (
   }
 
   // ============================================================
-  // Step 3: 認可URLの構築
+  // Step 3: OIDC Discovery から認可エンドポイントを取得
   // ============================================================
 
-  // 環境変数から必要な値を取得
-  const cognitoDomain = process.env.COGNITO_DOMAIN;
-  const clientId = process.env.COGNITO_CLIENT_ID;
-  const redirectUri = process.env.REDIRECT_URI;
+  let authorizeEndpoint: string;
+  let clientId: string;
+  let redirectUri: string;
 
-  // 環境変数が設定されていない場合はエラー
-  if (!cognitoDomain || !clientId || !redirectUri) {
-    console.error('Missing required environment variables', {
-      COGNITO_DOMAIN: cognitoDomain ? 'set' : 'not set',
-      COGNITO_CLIENT_ID: clientId ? 'set' : 'not set',
-      REDIRECT_URI: redirectUri ? 'set' : 'not set',
-    });
+  try {
+    // 環境変数から OIDC 設定を取得
+    const envVars = getOidcEnvVars();
+    clientId = envVars.clientId;
+    redirectUri = envVars.redirectUri;
 
+    // OIDC Discovery を実行して認可エンドポイントを取得
+    // これにより、OP が Cognito、Auth0、Keycloak 等に関わらず動作する
+    authorizeEndpoint = await getAuthorizationEndpoint();
+  } catch (error) {
+    console.error('Failed to get OIDC configuration', error);
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -124,8 +128,9 @@ export const handler = async (
     };
   }
 
-  // 認可エンドポイントURL: ${COGNITO_DOMAIN}/oauth2/authorize
-  const authorizeEndpoint = `${cognitoDomain}/oauth2/authorize`;
+  // ============================================================
+  // Step 4: 認可URLの構築
+  // ============================================================
 
   // URLSearchParamsを使用してクエリパラメータを安全に構築
   // これにより特殊文字が適切にURLエンコードされる
@@ -134,12 +139,12 @@ export const handler = async (
     // 認可コードを受け取り、後でトークンエンドポイントでIDトークンに交換する
     response_type: 'code',
 
-    // client_id: Cognito App Client ID
+    // client_id: OP に登録されたクライアント ID
     // どのアプリケーションからのリクエストかを識別
     client_id: clientId,
 
     // redirect_uri: 認証後のリダイレクト先
-    // Cognitoの App Client に設定したものと完全一致が必要
+    // OP に設定したものと完全一致が必要
     redirect_uri: redirectUri,
 
     // scope: 取得する情報の範囲
@@ -172,17 +177,17 @@ export const handler = async (
   });
 
   // ============================================================
-  // Step 4: セッションCookieの設定と302リダイレクト
+  // Step 5: セッションCookieの設定と302リダイレクト
   // ============================================================
 
   // セッションIDをCookieに保存（セキュリティパラメータはDynamoDBに保存済み）
   // HttpOnly, Secure, SameSite=Lax で保護
   // - HttpOnly: JavaScriptからアクセス不可（XSS対策）
   // - Secure: HTTPS接続でのみ送信
-  // - SameSite=Lax: Cognitoからのリダイレクト時にCookieが送信されるよう設定
+  // - SameSite=Lax: OPからのリダイレクト時にCookieが送信されるよう設定
   const sessionCookie = createSessionCookie(sessionId);
 
-  // 302 Found でCognitoの認可エンドポイントにリダイレクト
+  // 302 Found でOPの認可エンドポイントにリダイレクト
   // API Gateway HTTP API (v2) では cookies 配列を使用してCookieを設定
   return {
     statusCode: 302,

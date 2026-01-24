@@ -522,6 +522,7 @@ backend/
 │   │   └── account.ts            # /api/account ハンドラー
 │   ├── utils/
 │   │   ├── cookie.ts             # Cookie操作ユーティリティ（未使用）
+│   │   ├── oidc-config.ts        # OIDC Discovery ユーティリティ
 │   │   ├── pkce.ts               # PKCE生成ユーティリティ
 │   │   └── session.ts            # セッション管理ユーティリティ（DynamoDB）
 │   └── types/
@@ -530,7 +531,36 @@ backend/
 └── tsconfig.json
 ```
 
-### 4.2 使用ライブラリ
+### 4.2 OIDC Discovery
+
+OIDC Discovery は、OP（OpenID Provider）のメタデータを自動取得する仕組みです。
+Issuer URL から `/.well-known/openid-configuration` にアクセスすることで、各種エンドポイントを動的に取得できます。
+
+**Discovery レスポンス例:**
+
+```json
+{
+  "issuer": "https://cognito-idp.ap-northeast-1.amazonaws.com/{userPoolId}",
+  "authorization_endpoint": "https://xxx.auth.ap-northeast-1.amazoncognito.com/oauth2/authorize",
+  "token_endpoint": "https://xxx.auth.ap-northeast-1.amazoncognito.com/oauth2/token",
+  "userinfo_endpoint": "https://xxx.auth.ap-northeast-1.amazoncognito.com/oauth2/userInfo",
+  "jwks_uri": "https://cognito-idp.ap-northeast-1.amazonaws.com/{userPoolId}/.well-known/jwks.json"
+}
+```
+
+**メリット:**
+
+- OP のエンドポイント URL をハードコードする必要がない
+- Cognito、Auth0、Keycloak など、異なる OP に対応可能
+- OP 側の設定変更（エンドポイント変更等）に自動追従
+
+**本プロジェクトでの使用:**
+
+- `login.ts`: `authorization_endpoint` を取得
+- `callback.ts`: `token_endpoint`, `jwks_uri` を取得（openid-client 内部で使用）
+- `account.ts`: `userinfo_endpoint` を取得
+
+### 4.3 使用ライブラリ
 
 | ライブラリ               | 用途                                                |
 | ------------------------ | --------------------------------------------------- |
@@ -547,7 +577,7 @@ backend/
 
 今回は `openid-client` を採用し、ブラックボックス化される処理はコメントで解説します。
 
-### 4.3 セッション管理（session.ts）
+### 4.4 セッション管理（session.ts）
 
 ```typescript
 import * as crypto from 'crypto'
@@ -628,19 +658,23 @@ export async function deleteSession(sessionId: string): Promise<void> {
 }
 ```
 
-### 4.4 環境変数
+### 4.5 環境変数
 
-| 変数名                | 説明                         |
-| --------------------- | ---------------------------- |
-| COGNITO_USER_POOL_ID  | Cognito User Pool ID         |
-| COGNITO_CLIENT_ID     | OIDCクライアントID           |
-| COGNITO_CLIENT_SECRET | OIDCクライアントシークレット |
-| COGNITO_DOMAIN        | Cognitoドメイン（ホストUI）  |
-| REDIRECT_URI          | 認証後のリダイレクトURI      |
-| FRONTEND_URL          | フロントエンドのURL          |
-| SESSION_TABLE_NAME    | DynamoDBテーブル名           |
+| 変数名             | 説明                                            |
+| ------------------ | ----------------------------------------------- |
+| OIDC_ISSUER        | OIDC Issuer URL（OIDC Discovery のベース URL） |
+| OIDC_CLIENT_ID     | OIDCクライアントID                              |
+| OIDC_CLIENT_SECRET | OIDCクライアントシークレット                    |
+| REDIRECT_URI       | 認証後のリダイレクトURI                         |
+| SESSION_TABLE_NAME | DynamoDBテーブル名                              |
 
-### 4.5 DynamoDBテーブル設計
+**OIDC_ISSUER の例:**
+
+- Cognito: `https://cognito-idp.ap-northeast-1.amazonaws.com/{userPoolId}`
+- Auth0: `https://{tenant}.auth0.com`
+- Keycloak: `https://{host}/realms/{realm}`
+
+### 4.6 DynamoDBテーブル設計
 
 セッションテーブルは2種類のデータを保存します。
 
@@ -669,9 +703,9 @@ export async function deleteSession(sessionId: string): Promise<void> {
 - **課金モード**: オンデマンド（PAY_PER_REQUEST）
 - **備考**: 認可フロー完了時に認可フロー用データを認証済みデータで上書き
 
-### 4.6 実装時の注意事項
+### 4.7 実装時の注意事項
 
-#### 4.6.1 リダイレクトURLの不一致
+#### 4.7.1 リダイレクトURLの不一致
 
 OPに登録したURLと、コードで指定する `redirect_uri` は **完全一致** が必要です。
 
@@ -683,7 +717,7 @@ OPに登録したURLと、コードで指定する `redirect_uri` は **完全�
 
 **対策**: CDKで生成したCloudFrontのURLを環境変数として渡し、Cognito App Client の設定と Lambda の両方で同じ値を参照するようにします。
 
-#### 4.6.2 Clock Skew（時計のズレ）
+#### 4.7.2 Clock Skew（時計のズレ）
 
 サーバー間の時刻が数秒ズレているだけで、IDトークン検証時に以下のエラーが発生する可能性があります。
 
@@ -692,7 +726,7 @@ OPに登録したURLと、コードで指定する `redirect_uri` は **完全�
 
 **対策**: `openid-client` の `clockTolerance` オプションで数秒の猶予を設定します。
 
-#### 4.6.3 JWKのキャッシュ
+#### 4.7.3 JWKのキャッシュ
 
 IDトークンの署名検証には、OPから公開鍵（JWK）を取得する必要があります。検証のたびにOPへ取得しに行くと、レイテンシが増加します。
 
@@ -700,7 +734,7 @@ IDトークンの署名検証には、OPから公開鍵（JWK）を取得する�
 
 **補足**: 本番環境で頻繁なコールドスタートが問題になる場合は、Provisioned Concurrency の使用を検討してください。
 
-#### 4.6.4 DynamoDBのTTL
+#### 4.7.4 DynamoDBのTTL
 
 DynamoDBのTTLは即座に削除されるわけではありません（最大48時間のラグ）。ただし、認証完了後に明示的に `DeleteItem` を呼び出すため、通常はセッションデータは即座に無効化されます。
 

@@ -7,7 +7,7 @@
  * 処理フロー:
  * 1. CookieからセッションIDを取得
  * 2. DynamoDBからアクセストークンを取得
- * 3. Cognito UserInfoエンドポイントでトークン検証
+ * 3. OP の UserInfo エンドポイントでトークン検証
  * 4. 口座番号（ダミー）を生成して返却
  * 5. セッションデータをDynamoDBから削除
  *
@@ -23,6 +23,7 @@ import {
   APIGatewayProxyResultV2,
 } from 'aws-lambda';
 
+import { getUserInfoEndpoint } from '../utils/oidc-config';
 import {
   createDeleteSessionCookie,
   deleteSession,
@@ -53,22 +54,26 @@ interface ErrorResponse {
 }
 
 /**
- * Cognito UserInfoエンドポイントからユーザー情報を取得する
+ * OP の UserInfo エンドポイントからユーザー情報を取得する
  *
  * アクセストークンの有効性を検証し、ユーザー情報を取得する。
  * トークンが無効な場合はnullを返す。
  *
- * @param accessToken - Cognitoのアクセストークン
+ * @param accessToken - アクセストークン
  * @returns ユーザー情報（sub, email）、無効な場合はnull
  */
 async function verifyTokenWithUserInfo(
   accessToken: string
 ): Promise<{ sub: string; email: string } | null> {
-  // Cognito UserInfo エンドポイントのURL
-  // 環境変数 COGNITO_DOMAIN はCDKで設定される
-  // 形式: https://<domain-prefix>.auth.<region>.amazoncognito.com
-  const cognitoDomain = process.env.COGNITO_DOMAIN!;
-  const userInfoUrl = `${cognitoDomain}/oauth2/userInfo`;
+  // OIDC Discovery から UserInfo エンドポイントを取得
+  // これにより、OP が Cognito、Auth0、Keycloak 等に関わらず動作する
+  let userInfoUrl: string;
+  try {
+    userInfoUrl = await getUserInfoEndpoint();
+  } catch (error) {
+    console.error('Failed to get UserInfo endpoint from OIDC Discovery', error);
+    return null;
+  }
 
   console.log('Calling UserInfo endpoint', { userInfoUrl });
 
@@ -169,7 +174,7 @@ function jsonResponse(
  * 口座作成APIのハンドラー
  *
  * 認証済みユーザーに対して口座番号を生成して返却する。
- * アクセストークンの検証はCognito UserInfoエンドポイントで行う。
+ * アクセストークンの検証は OP の UserInfo エンドポイントで行う。
  *
  * @param event - API Gateway HTTP API (v2) からのイベント
  * @returns JSONレスポンス（成功時: 口座番号、失敗時: エラー）
@@ -241,7 +246,7 @@ export const handler = async (
   }
 
   // ============================================================
-  // Step 3: Cognito UserInfoエンドポイントでトークン検証
+  // Step 3: OP の UserInfo エンドポイントでトークン検証
   // ============================================================
 
   const userInfo = await verifyTokenWithUserInfo(accessToken);

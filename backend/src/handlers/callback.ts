@@ -1,7 +1,7 @@
 /**
  * /api/auth/callback ハンドラー
  *
- * Cognito（OP）からのコールバックを処理し、トークン交換・検証を行う。
+ * OP（OpenID Provider）からのコールバックを処理し、トークン交換・検証を行う。
  * openid-client ライブラリを使用して以下の検証を自動実行:
  * - State検証（CSRF攻撃対策）
  * - PKCE検証（認可コード横取り攻撃対策）
@@ -24,6 +24,7 @@ import {
 } from 'aws-lambda';
 import * as client from 'openid-client';
 
+import { getOidcConfig } from '../utils/oidc-config';
 import {
   createSessionCookie,
   deleteSession,
@@ -58,54 +59,6 @@ const ERROR_CODES = {
   /** その他の認証エラー */
   AUTHENTICATION_FAILED: 'authentication_failed',
 } as const;
-
-/**
- * openid-client の Configuration インスタンスをキャッシュ
- * Lambda のウォームスタート時に再利用することで、
- * OIDC Discovery のリクエストを削減
- */
-let cachedConfig: client.Configuration | null = null;
-
-/**
- * OIDC Discovery を実行して Configuration を取得
- *
- * Cognito の OIDC Discovery エンドポイントにアクセスし、
- * トークンエンドポイントや JWKS の場所などの情報を自動取得する。
- *
- * @returns openid-client の Configuration インスタンス
- */
-async function getOidcConfig(): Promise<client.Configuration> {
-  // キャッシュがあれば再利用（ウォームスタート時の最適化）
-  if (cachedConfig) {
-    return cachedConfig;
-  }
-
-  const userPoolId = process.env.COGNITO_USER_POOL_ID!;
-  const clientId = process.env.COGNITO_CLIENT_ID!;
-  const clientSecret = process.env.COGNITO_CLIENT_SECRET!;
-  const region = userPoolId.split('_')[0]; // ap-northeast-1_XXXXX → ap-northeast-1
-
-  // Cognito の Issuer URL
-  // 形式: https://cognito-idp.{region}.amazonaws.com/{userPoolId}
-  const issuerUrl = new URL(
-    `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`
-  );
-
-  console.log('Starting OIDC Discovery', { issuerUrl: issuerUrl.toString() });
-
-  // OIDC Discovery を実行
-  // - /.well-known/openid-configuration にアクセス
-  // - トークンエンドポイント、JWKS URI などを自動取得
-  cachedConfig = await client.discovery(
-    issuerUrl,
-    clientId,
-    clientSecret // ClientSecretPost がデフォルトで使用される
-  );
-
-  console.log('OIDC Discovery completed');
-
-  return cachedConfig;
-}
 
 /**
  * エラーページへのリダイレクトレスポンスを生成
@@ -211,7 +164,7 @@ function getErrorCode(error: unknown): string {
 /**
  * コールバックエンドポイントのハンドラー
  *
- * Cognito（OP）からのリダイレクトを受け取り、認可コードをトークンに交換する。
+ * OP（OpenID Provider）からのリダイレクトを受け取り、認可コードをトークンに交換する。
  * openid-client ライブラリが以下の検証を自動実行:
  * 1. State照合 - CSRF攻撃対策
  * 2. トークン交換 - 認可コードをIDトークンに交換
@@ -318,6 +271,8 @@ export const handler = async (
 
   let config: client.Configuration;
   try {
+    // OIDC Discovery を実行して Configuration を取得
+    // 共通モジュールを使用することで、OP の種類に依存しない
     config = await getOidcConfig();
   } catch (error) {
     console.error('OIDC Discovery failed', error);

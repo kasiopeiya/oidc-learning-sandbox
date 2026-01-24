@@ -324,21 +324,20 @@ export class OidcSandboxStack extends Stack {
       architecture: lambda.Architecture.ARM_64,
       memorySize: 256,
       timeout: Duration.seconds(10),
-      // 環境変数: Cognito 情報と URL
+      // 環境変数: OIDC Provider（OP）情報と URL
+      // OIDC 標準の用語を使用し、Cognito 以外の OP（Auth0、Keycloak 等）にも対応可能
       environment: {
-        // Cognito User Pool ID
-        COGNITO_USER_POOL_ID: this.userPool.userPoolId,
-        // Cognito App Client ID
-        COGNITO_CLIENT_ID: this.userPoolClient.userPoolClientId,
-        // Cognito App Client Secret（Secrets Manager 推奨だが学習用途のため環境変数で保持）
-        COGNITO_CLIENT_SECRET:
+        // OIDC Issuer URL（OP の識別子）
+        // Cognito の場合: https://cognito-idp.{region}.amazonaws.com/{userPoolId}
+        // OIDC Discovery: {OIDC_ISSUER}/.well-known/openid-configuration
+        OIDC_ISSUER: `https://cognito-idp.${this.region}.amazonaws.com/${this.userPool.userPoolId}`,
+        // OIDC Client ID（OP に登録されたクライアント識別子）
+        OIDC_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        // OIDC Client Secret（Secrets Manager 推奨だが学習用途のため環境変数で保持）
+        OIDC_CLIENT_SECRET:
           this.userPoolClient.userPoolClientSecret.unsafeUnwrap(),
-        // Cognito ドメイン（ホスト UI のベース URL）
-        COGNITO_DOMAIN: `https://${this.userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`,
         // 認証後のリダイレクト先 URL（CloudFront 経由）
         REDIRECT_URI: `https://${this.distribution.distributionDomainName}/api/auth/callback`,
-        // フロントエンドの URL（CloudFront）
-        FRONTEND_URL: `https://${this.distribution.distributionDomainName}`,
         // セッション管理用DynamoDBテーブル名
         SESSION_TABLE_NAME: this.sessionTable.tableName,
       },
@@ -351,7 +350,7 @@ export class OidcSandboxStack extends Stack {
 
     // Login Lambda関数
     // - /api/auth/login エンドポイントを処理
-    // - 認可リクエスト URL を生成し、Cognito にリダイレクト
+    // - 認可リクエスト URL を生成し、OP にリダイレクト
     this.loginFunction = new nodejs.NodejsFunction(this, 'LoginFunction', {
       ...lambdaCommonProps,
       entry: path.join(__dirname, '../../backend/src/handlers/login.ts'),
@@ -372,7 +371,7 @@ export class OidcSandboxStack extends Stack {
     // Account Lambda関数
     // - /api/account エンドポイントを処理
     // - アクセストークンで保護されたAPIの実装例
-    // - Cognito UserInfoエンドポイントでトークンを検証
+    // - OP の UserInfo エンドポイントでトークンを検証
     this.accountFunction = new nodejs.NodejsFunction(this, 'AccountFunction', {
       ...lambdaCommonProps,
       entry: path.join(__dirname, '../../backend/src/handlers/account.ts'),
@@ -396,7 +395,7 @@ export class OidcSandboxStack extends Stack {
     });
 
     // /api/auth/callback ルート
-    // - GET メソッドで Cognito からのコールバックを処理
+    // - GET メソッドで OP からのコールバックを処理
     this.httpApi.addRoutes({
       path: '/api/auth/callback',
       methods: [apigw.HttpMethod.GET],
