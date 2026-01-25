@@ -6,13 +6,13 @@
 
 ### 1.1 基本情報
 
-| 項目 | 値 |
-|------|-----|
+| 項目           | 値                     |
+| -------------- | ---------------------- |
 | プロジェクト名 | OIDC学習サンドボックス |
-| 環境 | 開発環境（dev）のみ |
-| リージョン | 東京（ap-northeast-1） |
-| IaCツール | AWS CDK（TypeScript） |
-| スタック名 | oidc-sandbox-app |
+| 環境           | 開発環境（dev）のみ    |
+| リージョン     | 東京（ap-northeast-1） |
+| IaCツール      | AWS CDK（TypeScript）  |
+| スタック名     | oidc-sandbox-app       |
 
 ### 1.2 設計方針
 
@@ -38,15 +38,10 @@
 │  │    │             │                           └─────────────┘             │ │
 │  │    │  CloudFront │                                                       │ │
 │  │    │             │                           ┌─────────────┐             │ │
-│  │    └──────┬──────┘     /api/* ──────────────▶│     API     │             │ │
-│  │           │                                  │   Gateway   │             │ │
+│  │    └──────┬──────┘    /api/* ───────────────▶│   Lambda    │             │ │
+│  │           │                                  │ Function    │             │ │
+│  │           │ xxxxx.cloudfront.net             │   URLs      │             │ │
 │  │           │                                  └──────┬──────┘             │ │
-│  │           │ xxxxx.cloudfront.net                    │                    │ │
-│  │           │                                   ┌─────▼─────┐              │ │
-│  │           │                                   │           │              │ │
-│  │           │                                   │  Lambda   │              │ │
-│  │           │                                   │           │              │ │
-│  │           │                                   └─────┬─────┘              │ │
 │  │           │                                         │                    │ │
 │  │           │                                         │ トークン交換       │ │
 │  │           │                                         ▼                    │ │
@@ -68,10 +63,12 @@
 
 ### 2.1 CloudFront のルーティング
 
-| パスパターン | 転送先 | 説明 |
-|-------------|--------|------|
-| `/api/*` | API Gateway | バックエンド API |
-| `/*`（デフォルト） | S3 | 静的ファイル（HTML/JS/CSS） |
+| パスパターン         | 転送先              | 説明                        |
+| -------------------- | ------------------- | --------------------------- |
+| `/api/auth/login`    | Lambda Function URL | 認可リクエストURL生成       |
+| `/api/auth/callback` | Lambda Function URL | コールバック処理            |
+| `/api/account`       | Lambda Function URL | 口座作成API                 |
+| `/*`（デフォルト）   | S3                  | 静的ファイル（HTML/JS/CSS） |
 
 ### 2.2 リクエストフロー
 
@@ -95,9 +92,9 @@ S3 バケット
    ▼
 CloudFront
    │
-   │ 5. パスが /api/* なので API Gateway に転送
+   │ 5. パスが /api/auth/login なので Lambda Function URL に転送
    ▼
-API Gateway → Lambda
+Lambda (Function URL)
    │
    │ 6. 認可リクエストURLを生成して返す
    ▼
@@ -110,7 +107,7 @@ Cognito (OP)
    │ 8. ログイン画面を表示
    │ 9. 認証成功後、認可コード付きでコールバックURLにリダイレクト
    ▼
-ブラウザ → CloudFront → API Gateway → Lambda
+ブラウザ → CloudFront → Lambda (Function URL)
    │
    │ 10. 認可コードをトークンに交換
    │ 11. ID トークンを検証
@@ -141,24 +138,24 @@ Cognito は AWS が提供する認証サービスです。今回は以下の役�
 
 #### 3.1.2 User Pool 設定
 
-| 設定項目 | 値 | 説明 |
-|----------|-----|------|
-| サインイン属性 | email | メールアドレスでログイン |
-| パスワードポリシー | デフォルト（8文字以上、大文字小文字数字記号） | Cognito のデフォルト設定を使用 |
-| MFA | なし | 学習用途のため簡略化 |
-| メール検証 | あり | Cognito デフォルトのメール送信を使用 |
-| セルフサインアップ | 許可 | ユーザー自身でアカウント作成可能 |
+| 設定項目           | 値                                            | 説明                                 |
+| ------------------ | --------------------------------------------- | ------------------------------------ |
+| サインイン属性     | email                                         | メールアドレスでログイン             |
+| パスワードポリシー | デフォルト（8文字以上、大文字小文字数字記号） | Cognito のデフォルト設定を使用       |
+| MFA                | なし                                          | 学習用途のため簡略化                 |
+| メール検証         | あり                                          | Cognito デフォルトのメール送信を使用 |
+| セルフサインアップ | 許可                                          | ユーザー自身でアカウント作成可能     |
 
 #### 3.1.3 App Client 設定
 
-| 設定項目 | 値 | 説明 |
-|----------|-----|------|
-| クライアントタイプ | Confidential Client | クライアントシークレットあり |
-| 認証フロー | 認可コードフロー | OIDC標準のフロー |
-| コールバックURL | https://xxxxx.cloudfront.net/callback | 認証後のリダイレクト先 |
-| サインアウトURL | https://xxxxx.cloudfront.net | ログアウト後のリダイレクト先 |
-| OAuth スコープ | openid, email, profile | 基本的なユーザー情報を取得 |
-| PKCE | 有効（S256） | セキュリティ強化のため必須 |
+| 設定項目           | 値                                    | 説明                         |
+| ------------------ | ------------------------------------- | ---------------------------- |
+| クライアントタイプ | Confidential Client                   | クライアントシークレットあり |
+| 認証フロー         | 認可コードフロー                      | OIDC標準のフロー             |
+| コールバックURL    | https://xxxxx.cloudfront.net/callback | 認証後のリダイレクト先       |
+| サインアウトURL    | https://xxxxx.cloudfront.net          | ログアウト後のリダイレクト先 |
+| OAuth スコープ     | openid, email, profile                | 基本的なユーザー情報を取得   |
+| PKCE               | 有効（S256）                          | セキュリティ強化のため必須   |
 
 #### 3.1.4 Cognito ドメイン
 
@@ -178,13 +175,13 @@ https://<prefix>.auth.ap-northeast-1.amazoncognito.com
 
 #### 3.2.1 バケット設定
 
-| 設定項目 | 値 | 説明 |
-|----------|-----|------|
-| バケット名 | CDK 自動生成 | ユニークな名前が自動付与される |
-| パブリックアクセス | ブロック（全て） | CloudFront 経由でのみアクセス可能 |
-| バージョニング | 無効 | 学習用途のため不要 |
-| 暗号化 | SSE-S3（デフォルト） | S3 マネージドキーで暗号化 |
-| 削除ポリシー | DESTROY | スタック削除時にバケットも削除 |
+| 設定項目           | 値                   | 説明                              |
+| ------------------ | -------------------- | --------------------------------- |
+| バケット名         | CDK 自動生成         | ユニークな名前が自動付与される    |
+| パブリックアクセス | ブロック（全て）     | CloudFront 経由でのみアクセス可能 |
+| バージョニング     | 無効                 | 学習用途のため不要                |
+| 暗号化             | SSE-S3（デフォルト） | S3 マネージドキーで暗号化         |
+| 削除ポリシー       | DESTROY              | スタック削除時にバケットも削除    |
 
 #### 3.2.2 配置するファイル
 
@@ -206,35 +203,37 @@ S3 と API Gateway の前段に配置し、単一ドメインで HTTPS コンテ
 
 #### 3.3.1 CloudFront を使う理由
 
-| 理由 | 説明 |
-|------|------|
-| HTTPS 対応 | OIDCではコールバックURLにHTTPSが必要 |
+| 理由         | 説明                                                         |
+| ------------ | ------------------------------------------------------------ |
+| HTTPS 対応   | OIDCではコールバックURLにHTTPSが必要                         |
 | 単一ドメイン | フロントエンドと API を同一ドメインで提供（CORS 設定が不要） |
-| キャッシュ | 静的ファイルの配信を高速化 |
-| セキュリティ | S3 への直接アクセスを防ぐ |
+| キャッシュ   | 静的ファイルの配信を高速化                                   |
+| セキュリティ | S3 への直接アクセスを防ぐ                                    |
 
 #### 3.3.2 ディストリビューション設定
 
-| 設定項目 | 値 | 説明 |
-|----------|-----|------|
-| ドメイン | デフォルト（xxxxx.cloudfront.net） | 独自ドメインは使用しない |
-| プロトコル | HTTPS のみ | HTTP は HTTPS にリダイレクト |
-| デフォルトルートオブジェクト | index.html | ルートアクセス時に返すファイル |
-| 価格クラス | PriceClass.PRICE_CLASS_100 | 北米・欧州のみ（コスト削減） |
+| 設定項目                     | 値                                 | 説明                           |
+| ---------------------------- | ---------------------------------- | ------------------------------ |
+| ドメイン                     | デフォルト（xxxxx.cloudfront.net） | 独自ドメインは使用しない       |
+| プロトコル                   | HTTPS のみ                         | HTTP は HTTPS にリダイレクト   |
+| デフォルトルートオブジェクト | index.html                         | ルートアクセス時に返すファイル |
+| 価格クラス                   | PriceClass.PRICE_CLASS_100         | 北米・欧州のみ（コスト削減）   |
 
 #### 3.3.3 オリジン設定
 
-| オリジン | 転送先 | 説明 |
-|----------|--------|------|
-| S3 オリジン | S3 バケット（OAC 経由） | 静的ファイル配信用 |
-| API オリジン | API Gateway | バックエンド API 用 |
+| オリジン           | 転送先                  | 説明               |
+| ------------------ | ----------------------- | ------------------ |
+| S3 オリジン        | S3 バケット（OAC 経由） | 静的ファイル配信用 |
+| Lambda オリジン x3 | Lambda Function URLs    | バックエンド API用 |
 
 #### 3.3.4 ビヘイビア（振り分けルール）
 
-| 優先度 | パスパターン | オリジン | キャッシュポリシー |
-|--------|-------------|----------|-------------------|
-| 1 | `/api/*` | API Gateway | CachingDisabled（キャッシュなし） |
-| 2（デフォルト） | `*` | S3 | CachingOptimized |
+| 優先度          | パスパターン         | オリジン                   | キャッシュポリシー                |
+| --------------- | -------------------- | -------------------------- | --------------------------------- |
+| 1               | `/api/auth/login`    | Lambda Function URL (Login) | CachingDisabled（キャッシュなし） |
+| 2               | `/api/auth/callback` | Lambda Function URL (Callback) | CachingDisabled（キャッシュなし） |
+| 3               | `/api/account`       | Lambda Function URL (Account) | CachingDisabled（キャッシュなし） |
+| 4（デフォルト） | `*`                  | S3                         | CachingOptimized                  |
 
 #### 3.3.5 OAC（Origin Access Control）とは？
 
@@ -251,31 +250,21 @@ CloudFront から S3 にアクセスするための仕組みです。
 
 ---
 
-### 3.4 Amazon API Gateway
+### 3.4 Lambda Function URLs
 
-バックエンド API のエントリーポイントです。
+API Gateway の代替として Lambda Function URLs を使用します。CloudFront から直接 Lambda を呼び出すことで、よりシンプルな構成を実現します。
 
-#### 3.4.1 API タイプ
+#### 3.4.1 エンドポイント一覧
 
-**HTTP API** を使用します（REST API ではない）。
+| CloudFront パス    | Lambda 関数      | 説明                             |
+| ------------------ | ---------------- | -------------------------------- |
+| /api/auth/login    | LoginFunction    | 認可リクエストURL生成            |
+| /api/auth/callback | CallbackFunction | コールバック処理（トークン交換） |
+| /api/account       | AccountFunction  | 口座作成API                      |
 
-| 比較項目 | HTTP API | REST API |
-|----------|----------|----------|
-| 料金 | 安い（約70%オフ） | 高い |
-| 機能 | 基本的な機能のみ | 豊富（API キーなど） |
-| レイテンシ | 低い | 普通 |
-| 今回の用途 | ✅ 十分 | オーバースペック |
+#### 3.4.2 認証設定
 
-#### 3.4.2 エンドポイント一覧
-
-| パス | メソッド | 説明 | Lambda 関数 |
-|------|----------|------|-------------|
-| /api/auth/login | GET | 認可リクエストURL生成 | auth-handler |
-| /api/auth/callback | GET | コールバック処理（トークン交換） | auth-handler |
-
-#### 3.4.3 CORS 設定
-
-CloudFront 経由で同一ドメインからのアクセスとなるため、**CORS 設定は不要**です。
+**authType: NONE** を使用します。CloudFront 経由でのアクセスを想定しており、Lambda 関数内でセッション認証を行います。
 
 ---
 
@@ -288,45 +277,54 @@ OIDC の RP（Relying Party）ロジックを実行します。
 **NodejsFunction** を使用します。
 
 ```typescript
-import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs'
 ```
 
-| 比較項目 | NodejsFunction | 通常の Function |
-|----------|----------------|-----------------|
-| TypeScript サポート | ✅ 自動でトランスパイル | 手動でビルドが必要 |
-| バンドル | ✅ esbuild で自動バンドル | 手動で設定が必要 |
-| tree-shaking | ✅ 自動で不要コード削除 | なし |
-| 設定の簡潔さ | ✅ シンプル | 複雑 |
+| 比較項目            | NodejsFunction            | 通常の Function    |
+| ------------------- | ------------------------- | ------------------ |
+| TypeScript サポート | ✅ 自動でトランスパイル   | 手動でビルドが必要 |
+| バンドル            | ✅ esbuild で自動バンドル | 手動で設定が必要   |
+| tree-shaking        | ✅ 自動で不要コード削除   | なし               |
+| 設定の簡潔さ        | ✅ シンプル               | 複雑               |
 
 TypeScript を直接指定でき、ビルド設定が不要なため採用します。
 
 #### 3.5.2 関数設定
 
-| 設定項目 | 値 | 説明 |
-|----------|-----|------|
-| 関数名 | CDK 自動生成 | スタック名がプレフィックスになる |
-| ランタイム | Node.js 24.x | 最新の LTS バージョン |
-| メモリ | 256 MB | 認証処理には十分 |
-| タイムアウト | 10 秒 | トークン交換に余裕を持たせる |
-| アーキテクチャ | arm64 | コスト効率が良い |
+| 設定項目       | 値           | 説明                             |
+| -------------- | ------------ | -------------------------------- |
+| 関数名         | CDK 自動生成 | スタック名がプレフィックスになる |
+| ランタイム     | Node.js 24.x | 最新の LTS バージョン            |
+| メモリ         | 256 MB       | 認証処理には十分                 |
+| タイムアウト   | 10 秒        | トークン交換に余裕を持たせる     |
+| アーキテクチャ | arm64        | コスト効率が良い                 |
 
 #### 3.5.3 環境変数
 
-| 変数名 | 値 | 説明 |
-|--------|-----|------|
-| COGNITO_USER_POOL_ID | User Pool ID | Cognito User Pool の識別子 |
-| COGNITO_CLIENT_ID | App Client ID | アプリクライアントの識別子 |
-| COGNITO_CLIENT_SECRET | App Client Secret | クライアントシークレット（Secrets Manager 推奨） |
-| COGNITO_DOMAIN | Cognito ドメイン | 認可エンドポイントのベースURL |
-| REDIRECT_URI | コールバックURL | 認証後のリダイレクト先 |
-| FRONTEND_URL | CloudFront URL | フロントエンドのURL |
+| 変数名                   | 値                 | 説明                                            |
+| ------------------------ | ------------------ | ----------------------------------------------- |
+| OIDC_ISSUER              | Issuer URL         | OIDC Issuer URL（OIDC Discovery のベース URL） |
+| OIDC_CLIENT_ID_KEY       | Secrets Manager名  | Client ID を保存した Secrets Manager のシークレット名 |
+| OIDC_CLIENT_SECRET_KEY   | Secrets Manager名  | Client Secret を保存した Secrets Manager のシークレット名 |
+| SSM_CLOUDFRONT_URL_PARAM | SSMパラメータ名    | CloudFront URLを取得するSSMパラメータ名         |
+| SESSION_TABLE_NAME       | DynamoDBテーブル名 | セッション管理用テーブル名                      |
+
+**シークレット管理:**
+
+Client ID と Client Secret は Secrets Manager に保存し、Lambda 関数は実行時に API で取得します。
+これにより、Lambda 環境変数に平文のシークレットを保存せず、セキュリティが向上します。
 
 #### 3.5.4 IAM ロール権限
 
-| 権限 | 用途 |
-|------|------|
-| AWSLambdaBasicExecutionRole | CloudWatch Logs への書き込み |
-| （Secrets Manager 使用時）secretsmanager:GetSecretValue | シークレットの取得 |
+| 権限                            | 用途                                      |
+| ------------------------------- | ----------------------------------------- |
+| AWSLambdaBasicExecutionRole     | CloudWatch Logs への書き込み              |
+| ssm:GetParameter                | SSM Parameter Store からURL取得           |
+| dynamodb:PutItem/GetItem/DeleteItem | セッション管理（DynamoDB操作）        |
+| secretsmanager:GetSecretValue   | Secrets Manager からシークレット取得      |
+
+**注意:** Secrets Manager の権限はワイルドカードリソース（`*`）で付与しています。
+これは CloudFormation の循環参照を回避するためです（詳細は Issue #14 参照）。
 
 #### 3.5.5 コールドスタートについて
 
@@ -334,11 +332,11 @@ Lambda は一定時間使用されないとインスタンスが停止し、次�
 
 **本番環境での対策例：**
 
-| 対策 | 説明 | コスト |
-|------|------|--------|
-| Provisioned Concurrency | 事前にインスタンスを起動しておく | 高い（常時課金） |
-| 定期的なウォームアップ | EventBridge で定期的に Lambda を呼び出す | 低い |
-| 依存関係の最小化 | node_modules を軽くして起動を速くする | なし |
+| 対策                    | 説明                                     | コスト           |
+| ----------------------- | ---------------------------------------- | ---------------- |
+| Provisioned Concurrency | 事前にインスタンスを起動しておく         | 高い（常時課金） |
+| 定期的なウォームアップ  | EventBridge で定期的に Lambda を呼び出す | 低い             |
+| 依存関係の最小化        | node_modules を軽くして起動を速くする    | なし             |
 
 **今回の対応：**
 
@@ -352,12 +350,13 @@ Lambda は一定時間使用されないとインスタンスが停止し、次�
 
 本番環境では、以下の理由から Stateful リソースと Stateless リソースでスタックを分割することが推奨されます。
 
-| リソース種別 | 例 | 特徴 |
-|-------------|-----|------|
-| Stateful | DB、S3、Cognito User Pool | データを保持する。誤削除すると復旧が困難 |
-| Stateless | Lambda、API Gateway、CloudFront | データを保持しない。再作成が容易 |
+| リソース種別 | 例                              | 特徴                                     |
+| ------------ | ------------------------------- | ---------------------------------------- |
+| Stateful     | DB、S3、Cognito User Pool       | データを保持する。誤削除すると復旧が困難 |
+| Stateless    | Lambda、API Gateway、CloudFront | データを保持しない。再作成が容易         |
 
 **スタック分割のメリット：**
+
 - Stateless リソースのみ頻繁に更新できる
 - Stateful リソースの誤削除リスクを軽減できる
 
@@ -372,8 +371,11 @@ oidc-sandbox-app (Stack)
 ├── Cognito Domain
 ├── S3 Bucket                ← Stateful
 ├── CloudFront Distribution  ← Stateless
-├── API Gateway (HTTP API)   ← Stateless
-└── Lambda Function          ← Stateless
+├── Lambda Functions         ← Stateless
+│   ├── LoginFunction (Function URL)
+│   ├── CallbackFunction (Function URL)
+│   └── AccountFunction (Function URL)
+└── DynamoDB Table           ← Stateful
 ```
 
 **単一スタックを採用する理由：**
@@ -389,16 +391,16 @@ oidc-sandbox-app (Stack)
 ```typescript
 // parameter.ts の構成イメージ
 export interface AppParameter {
-  envName: string;          // 環境名（dev）
-  projectName: string;      // プロジェクト名
-  region: string;           // リージョン
+  envName: string // 環境名（dev）
+  projectName: string // プロジェクト名
+  region: string // リージョン
 }
 
 export const devParameter: AppParameter = {
-  envName: "dev",
-  projectName: "oidc-sandbox",
-  region: "ap-northeast-1",
-};
+  envName: 'dev',
+  projectName: 'oidc-sandbox',
+  region: 'ap-northeast-1'
+}
 ```
 
 **parameter.ts を使う理由：**
@@ -419,13 +421,15 @@ export const devParameter: AppParameter = {
 
 ### 6.1 AWS 無料枠
 
-| サービス | 無料枠 | 今回の使用量 |
-|----------|--------|--------------|
-| Cognito | 50,000 MAU | 1〜3人 ✅ |
-| Lambda | 100万リクエスト/月 | 数百リクエスト ✅ |
-| API Gateway | 100万リクエスト/月（12ヶ月） | 数百リクエスト ✅ |
-| S3 | 5GB ストレージ | 数MB ✅ |
-| CloudFront | 1TB 転送/月 | 数MB ✅ |
+| サービス   | 無料枠                          | 今回の使用量      |
+| ---------- | ------------------------------- | ----------------- |
+| Cognito    | 50,000 MAU                      | 1〜3人 ✅         |
+| Lambda     | 100万リクエスト/月              | 数百リクエスト ✅ |
+| S3         | 5GB ストレージ                  | 数MB ✅           |
+| CloudFront | 1TB 転送/月                     | 数MB ✅           |
+| DynamoDB   | 25GB ストレージ、RCU/WCU 無料枠 | 数KB ✅           |
+
+※ Lambda Function URLs は Lambda の料金に含まれるため、追加課金なし
 
 ### 6.2 想定月額コスト
 
@@ -439,21 +443,21 @@ export const devParameter: AppParameter = {
 
 ### 7.1 実装済みのセキュリティ対策
 
-| 対策 | 説明 |
-|------|------|
-| HTTPS 強制 | CloudFront で HTTP → HTTPS リダイレクト |
-| S3 非公開 | OAC 経由でのみアクセス可能 |
-| PKCE | 認可コード横取り攻撃を防止 |
-| State パラメータ | CSRF 攻撃を防止 |
-| Nonce パラメータ | リプレイ攻撃を防止 |
+| 対策             | 説明                                    |
+| ---------------- | --------------------------------------- |
+| HTTPS 強制       | CloudFront で HTTP → HTTPS リダイレクト |
+| S3 非公開        | OAC 経由でのみアクセス可能              |
+| PKCE             | 認可コード横取り攻撃を防止              |
+| State パラメータ | CSRF 攻撃を防止                         |
+| Nonce パラメータ | リプレイ攻撃を防止                      |
 
 ### 7.2 学習用途のため簡略化した項目
 
-| 項目 | 本番環境での推奨 | 今回の対応 |
-|------|------------------|------------|
-| WAF | 有効化 | なし（コスト削減） |
-| クライアントシークレット管理 | Secrets Manager | 環境変数（簡略化） |
-| ログ監視 | CloudWatch Alarms | なし |
+| 項目                         | 本番環境での推奨  | 今回の対応                  |
+| ---------------------------- | ----------------- | --------------------------- |
+| WAF                          | 有効化            | なし（コスト削減）          |
+| クライアントシークレット管理 | Secrets Manager   | ✅ Secrets Manager で管理   |
+| ログ監視                     | CloudWatch Alarms | なし                        |
 
 ---
 
@@ -469,28 +473,28 @@ CDK では**スナップショットテスト**が一般的に推奨されます
 
 ```typescript
 // スナップショットテストの例
-import * as cdk from 'aws-cdk-lib';
-import { Template } from 'aws-cdk-lib/assertions';
-import { OidcSandboxStack } from '../lib/oidc-sandbox-stack';
+import * as cdk from 'aws-cdk-lib'
+import { Template } from 'aws-cdk-lib/assertions'
+import { OidcSandboxStack } from '../lib/oidc-sandbox-stack'
 
 test('Snapshot test', () => {
-  const app = new cdk.App();
-  const stack = new OidcSandboxStack(app, 'TestStack');
-  const template = Template.fromStack(stack);
-  expect(template.toJSON()).toMatchSnapshot();
-});
+  const app = new cdk.App()
+  const stack = new OidcSandboxStack(app, 'TestStack')
+  const template = Template.fromStack(stack)
+  expect(template.toJSON()).toMatchSnapshot()
+})
 ```
 
 ### 8.2 今回の対応
 
 **スナップショットテストは実施しません。**
 
-| 観点 | 理由 |
-|------|------|
-| 規模 | 小規模な学習用プロジェクト |
-| 変更頻度 | 頻繁な変更は想定しない |
-| 運用 | 個人利用のため、意図しない変更のリスクが低い |
-| 目的 | OIDC の学習が主目的であり、CDK のテストは範囲外 |
+| 観点     | 理由                                            |
+| -------- | ----------------------------------------------- |
+| 規模     | 小規模な学習用プロジェクト                      |
+| 変更頻度 | 頻繁な変更は想定しない                          |
+| 運用     | 個人利用のため、意図しない変更のリスクが低い    |
+| 目的     | OIDC の学習が主目的であり、CDK のテストは範囲外 |
 
 **本番環境では必須：**
 

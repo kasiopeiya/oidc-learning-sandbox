@@ -12,9 +12,17 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
 
 ## 開発ガイドライン
 
-### 1. コミットメッセージ形式
+### コミットメッセージ形式
 
 `type: description` 形式（feat/fix/docs/refactor/test/chore）
+
+### 主要コマンド
+
+CDKコマンド実行前にtscによるビルドは実行しないこと、必要ありません
+
+```bash
+cd cdk && npx cdk deploy
+```
 
 ## 技術スタック
 

@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.967.0",
+    "@aws-sdk/client-secrets-manager": "^3.967.0",
+    "@aws-sdk/client-ssm": "^3.967.0",
     "openid-client": "^6.3.3"
   },
   "devDependencies": {

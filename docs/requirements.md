@@ -14,7 +14,7 @@
 - **言語**: TypeScript(CDK、Lambda、フロントエンド全て統一)
 - **インフラ**: AWS CDK
 - **認証**: Amazon Cognito(OP)
-- **バックエンド**: API Gateway + Lambda
+- **バックエンド**: Lambda Function URLs（CloudFront経由）
 - **フロントエンド**: S3 + CloudFront
 
 ## MVP機能(最小構成)
@@ -40,6 +40,7 @@
 - ~~**実際の口座作成機能**~~: 実装済み
 - ~~**フロントエンドにReactを導入する**~~: 実装済み
 - ~~**OPを差し替え可能にする**~~: 実装済み（OIDC Discovery 対応）
+- ~~**API GWを廃止しLambda Function URLsに変更する**~~: インフラの構成を変更、CloudFrontからLambda Function URLs呼び出し、OACを設定し、セキュリティ強化する 実装済み
 - **テスト実装**:
   - 単体テスト: バックエンドのユーティリティ関数、エラーハンドリング
 - **認証フローログ可視化**: 各ステップ(認可リクエスト、トークン交換など)のパラメータやレスポンスをブラウザで確認

@@ -1,16 +1,17 @@
 import * as path from 'path';
 
-import { CfnOutput, Duration, Fn, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
-import { aws_apigatewayv2 as apigw } from 'aws-cdk-lib';
-import { aws_apigatewayv2_integrations as integrations } from 'aws-cdk-lib';
+import { CfnOutput, Duration, Fn, RemovalPolicy, SecretValue, Stack, StackProps } from 'aws-cdk-lib';
 import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
 import { aws_cloudfront_origins as origins } from 'aws-cdk-lib';
 import { aws_cognito as cognito } from 'aws-cdk-lib';
 import { aws_dynamodb as dynamodb } from 'aws-cdk-lib';
+import { aws_iam as iam } from 'aws-cdk-lib';
 import { aws_lambda as lambda } from 'aws-cdk-lib';
 import { aws_lambda_nodejs as nodejs } from 'aws-cdk-lib';
 import { aws_s3 as s3 } from 'aws-cdk-lib';
 import { aws_s3_deployment as s3deploy } from 'aws-cdk-lib';
+import { aws_ssm as ssm } from 'aws-cdk-lib';
+import { aws_secretsmanager as secretsmanager } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 
 /**
@@ -19,7 +20,7 @@ import { Construct } from 'constructs';
  * 以下のリソースを構築する:
  * - Amazon Cognito (OP: OpenID Provider)
  * - Amazon S3 + CloudFront (フロントエンド配信)
- * - Amazon API Gateway + Lambda (RP: Relying Party)
+ * - AWS Lambda + Lambda Function URLs (RP: Relying Party)
  */
 export class OidcSandboxStack extends Stack {
   /** Cognito User Pool - OIDCのOPとして機能 */
@@ -36,9 +37,6 @@ export class OidcSandboxStack extends Stack {
 
   /** CloudFrontディストリビューション - HTTPSでコンテンツを配信 */
   public readonly distribution: cloudfront.Distribution;
-
-  /** HTTP API - バックエンドAPIのエントリーポイント */
-  public readonly httpApi: apigw.HttpApi;
 
   /** Login Lambda関数 - 認可リクエストURL生成 */
   public readonly loginFunction: nodejs.NodejsFunction;
@@ -168,32 +166,13 @@ export class OidcSandboxStack extends Stack {
     });
 
     // ============================================================
-    // API Gateway HTTP API（バックエンドAPIのエントリーポイント）
-    // ============================================================
-
-    // HTTP API の作成
-    // - REST API より安価で低レイテンシ
-    // - Lambda との統合に必要な基本機能を提供
-    // - CORS 設定は CloudFront 経由のため不要
-    this.httpApi = new apigw.HttpApi(this, 'HttpApi', {
-      // API 名は CDK が自動生成（スタック名がプレフィックスになる）
-      description: 'OIDC学習サンドボックス - バックエンドAPI',
-    });
-
-    // API Gateway のエンドポイント URL からホスト名を抽出
-    // 例: https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com
-    // → xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.com
-    // 注意: apiEndpoint は CloudFormation Token のため、Fn.select と Fn.split を使用
-    const apiDomainName = Fn.select(2, Fn.split('/', this.httpApi.apiEndpoint));
-
-    // ============================================================
     // CloudFrontディストリビューション（HTTPS配信）
     // ============================================================
 
     // CloudFront ディストリビューションの作成
     // - S3 の静的ファイルを HTTPS で配信
     // - OAC（Origin Access Control）で S3 へのアクセスを制御
-    // - /api/* パスを API Gateway に転送
+    // - /api/* パスは Lambda Function URLs に転送（Lambda関数定義後に追加）
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       // デフォルトビヘイビア: S3バケットをオリジンとして設定
       // S3BucketOrigin.withOriginAccessControl を使用すると OAC が自動設定される
@@ -201,20 +180,6 @@ export class OidcSandboxStack extends Stack {
         origin: origins.S3BucketOrigin.withOriginAccessControl(this.websiteBucket),
         // HTTPS へのリダイレクトを有効化
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      },
-      // /api/* パスを API Gateway に転送するビヘイビア
-      additionalBehaviors: {
-        '/api/*': {
-          origin: new origins.HttpOrigin(apiDomainName),
-          // HTTPS へのリダイレクトを有効化
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          // API リクエストはキャッシュしない
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          // オリジンへのリクエストに全てのヘッダー、クエリ文字列、Cookie を転送
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-          // GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE を許可
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-        },
       },
       // ルートアクセス時に返すファイル
       defaultRootObject: 'index.html',
@@ -305,10 +270,14 @@ export class OidcSandboxStack extends Stack {
       description: 'S3 Bucket Name for Frontend',
     });
 
-    new CfnOutput(this, 'ApiEndpoint', {
-      value: this.httpApi.apiEndpoint,
-      description: 'API Gateway HTTP API Endpoint',
-    });
+
+    // ============================================================
+    // 定数定義: SecretManager のシークレット名
+    // ============================================================
+    // 樹幹参照エラーを避けるため、ここで定数を定義
+    // Cognito User Pool Client のクライアントシークレットを Secrets Manager に保存する場合の名前
+    const clientIdName = 'oidc-sandbox/client-id';
+    const clientSecretName = 'oidc-sandbox/client-secret';
 
     // ============================================================
     // Lambda関数（OIDC の RP: Relying Party）
@@ -319,6 +288,7 @@ export class OidcSandboxStack extends Stack {
     // - arm64: コスト効率が良いアーキテクチャ
     // - メモリ 256MB: 認証処理には十分
     // - タイムアウト 10秒: トークン交換に余裕を持たせる
+    // 注意: REDIRECT_URI は循環依存を避けるため、CloudFront ビヘイビア追加後に設定する
     const lambdaCommonProps = {
       runtime: lambda.Runtime.NODEJS_24_X,
       architecture: lambda.Architecture.ARM_64,
@@ -332,14 +302,14 @@ export class OidcSandboxStack extends Stack {
         // OIDC Discovery: {OIDC_ISSUER}/.well-known/openid-configuration
         OIDC_ISSUER: `https://cognito-idp.${this.region}.amazonaws.com/${this.userPool.userPoolId}`,
         // OIDC Client ID（OP に登録されたクライアント識別子）
-        OIDC_CLIENT_ID: this.userPoolClient.userPoolClientId,
-        // OIDC Client Secret（Secrets Manager 推奨だが学習用途のため環境変数で保持）
-        OIDC_CLIENT_SECRET:
-          this.userPoolClient.userPoolClientSecret.unsafeUnwrap(),
-        // 認証後のリダイレクト先 URL（CloudFront 経由）
-        REDIRECT_URI: `https://${this.distribution.distributionDomainName}/api/auth/callback`,
+        OIDC_CLIENT_ID_KEY: clientIdName,
+        // OIDC Client Secretを保存したSecrets Managerのシークレット名
+        OIDC_CLIENT_SECRET_KEY: clientSecretName,
         // セッション管理用DynamoDBテーブル名
         SESSION_TABLE_NAME: this.sessionTable.tableName,
+        // SSM Parameter Store のパラメータ名（CloudFront URL を取得するため）
+        // 循環参照を避けるため、固定値を設定し実行時に SSM API で値を取得
+        SSM_CLOUDFRONT_URL_PARAM: '/oidc-sandbox/cloudfront-url',
       },
       // esbuild によるバンドル設定
       bundling: {
@@ -380,41 +350,142 @@ export class OidcSandboxStack extends Stack {
     });
 
     // ============================================================
-    // API Gateway ルート定義
+    // Lambda Function URLs（API Gateway の代替）
     // ============================================================
 
-    // /api/auth/login ルート
-    // - GET メソッドで認可リクエストを開始
-    this.httpApi.addRoutes({
-      path: '/api/auth/login',
-      methods: [apigw.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration(
-        'LoginIntegration',
-        this.loginFunction
-      ),
+    // Login Lambda Function URL
+    // - CloudFront から直接 Lambda を呼び出すためのエンドポイント
+    const loginFunctionUrl = this.loginFunction.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
     });
 
-    // /api/auth/callback ルート
-    // - GET メソッドで OP からのコールバックを処理
-    this.httpApi.addRoutes({
-      path: '/api/auth/callback',
-      methods: [apigw.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration(
-        'CallbackIntegration',
-        this.callbackFunction
-      ),
+    // Callback Lambda Function URL
+    const callbackFunctionUrl = this.callbackFunction.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
     });
 
-    // /api/account ルート
-    // - POST メソッドで口座作成APIを呼び出し
-    // - アクセストークンで保護されたAPIの実装例
-    this.httpApi.addRoutes({
-      path: '/api/account',
-      methods: [apigw.HttpMethod.POST],
-      integration: new integrations.HttpLambdaIntegration(
-        'AccountIntegration',
-        this.accountFunction
+    // Account Lambda Function URL
+    const accountFunctionUrl = this.accountFunction.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+    });
+
+    // ============================================================
+    // CloudFront ビヘイビアの追加（Lambda Function URLs 用）
+    // ============================================================
+
+    // Lambda Function URL のホスト名を抽出
+    // 例: https://xxxxxxxxxx.lambda-url.ap-northeast-1.on.aws/
+    // → xxxxxxxxxx.lambda-url.ap-northeast-1.on.aws
+    const loginFunctionUrlHost = Fn.select(2, Fn.split('/', loginFunctionUrl.url));
+    const callbackFunctionUrlHost = Fn.select(2, Fn.split('/', callbackFunctionUrl.url));
+    const accountFunctionUrlHost = Fn.select(2, Fn.split('/', accountFunctionUrl.url));
+
+    // /api/auth/login パスを Login Lambda Function URL に転送
+    this.distribution.addBehavior('/api/auth/login', new origins.HttpOrigin(loginFunctionUrlHost), {
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+    });
+
+    // /api/auth/callback パスを Callback Lambda Function URL に転送
+    this.distribution.addBehavior('/api/auth/callback', new origins.HttpOrigin(callbackFunctionUrlHost), {
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+    });
+
+    // /api/account パスを Account Lambda Function URL に転送
+    this.distribution.addBehavior('/api/account', new origins.HttpOrigin(accountFunctionUrlHost), {
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+    });
+
+    // ============================================================
+    // SSM Parameter Store（CloudFront URL の保存）
+    // ============================================================
+
+    // CloudFront URL を SSM Parameter Store に保存
+    // Lambda 関数は固定のパラメータ名を持ち、実行時に SSM API で値を取得する
+    // これにより CloudFormation テンプレートレベルでの循環参照を回避
+    const ssmParamName = '/oidc-sandbox/cloudfront-url';
+    new ssm.StringParameter(this, 'CloudFrontUrlParam', {
+      parameterName: ssmParamName,
+      stringValue: `https://${this.distribution.distributionDomainName}`,
+      description: 'CloudFront Distribution URL for OIDC redirect',
+    });
+
+    // ============================================================
+    // Secrets Manager Secret の作成
+    // ============================================================
+
+    // Cognito の Client ID を Secrets Manager に保存
+    // userPoolClientId は文字列なので SecretValue.unsafePlainText() でラップ
+    new secretsmanager.Secret(this, 'ClientId', {
+      secretName: clientIdName,
+      secretStringValue: SecretValue.unsafePlainText(
+        this.userPoolClient.userPoolClientId
       ),
+      description: 'OIDC Client ID for Cognito User Pool Client',
+      // スタック削除時にSecretも削除（学習用のため）
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    // Cognito の Client Secret を Secrets Manager に保存
+    // userPoolClientSecret は SecretValue 型なので直接渡せる
+    new secretsmanager.Secret(this, 'ClientSecret', {
+      secretName: clientSecretName,
+      secretStringValue: this.userPoolClient.userPoolClientSecret,
+      description: 'OIDC Client Secret for Cognito User Pool Client',
+      // スタック削除時にSecretも削除（学習用のため）
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    // ============================================================
+    // Lambda 関数への権限付与
+    // ============================================================
+
+    // grantRead ではなく addToRolePolicy で直接 IAM ポリシーを追加
+    // SSM リソースへの参照を避けることで循環参照を回避
+    const ssmReadPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['ssm:GetParameter'],
+      resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter${ssmParamName}`],
+    });
+
+    this.loginFunction.addToRolePolicy(ssmReadPolicy);
+    this.callbackFunction.addToRolePolicy(ssmReadPolicy);
+
+    // Secrets Manager からクライアントシークレットを取得する権限を付与
+    // L2メソッド（grantRead）を使用するとSecrets Managerリソースへの参照が発生し循環参照になるため、
+    // addToRolePolicy でワイルドカードリソースを指定して直接IAMポリシーを追加
+    const secretsReadPolicy = new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['secretsmanager:GetSecretValue'],
+      resources: ['*'],
+    });
+
+    this.loginFunction.addToRolePolicy(secretsReadPolicy);
+    this.callbackFunction.addToRolePolicy(secretsReadPolicy);
+    this.accountFunction.addToRolePolicy(secretsReadPolicy);
+
+    // Lambda Function URLs の出力
+    new CfnOutput(this, 'LoginFunctionUrl', {
+      value: loginFunctionUrl.url,
+      description: 'Login Lambda Function URL',
+    });
+
+    new CfnOutput(this, 'CallbackFunctionUrl', {
+      value: callbackFunctionUrl.url,
+      description: 'Callback Lambda Function URL',
+    });
+
+    new CfnOutput(this, 'AccountFunctionUrl', {
+      value: accountFunctionUrl.url,
+      description: 'Account Lambda Function URL',
     });
 
     // ============================================================

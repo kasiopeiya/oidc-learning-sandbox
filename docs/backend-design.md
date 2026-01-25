@@ -524,7 +524,9 @@ backend/
 │   │   ├── cookie.ts             # Cookie操作ユーティリティ（未使用）
 │   │   ├── oidc-config.ts        # OIDC Discovery ユーティリティ
 │   │   ├── pkce.ts               # PKCE生成ユーティリティ
-│   │   └── session.ts            # セッション管理ユーティリティ（DynamoDB）
+│   │   ├── secrets.ts            # Secrets Manager ユーティリティ
+│   │   ├── session.ts            # セッション管理ユーティリティ（DynamoDB）
+│   │   └── ssm.ts                # SSM Parameter Store ユーティリティ
 │   └── types/
 │       └── index.ts              # 型定義
 ├── package.json
@@ -562,10 +564,12 @@ Issuer URL から `/.well-known/openid-configuration` にアクセスするこ�
 
 ### 4.3 使用ライブラリ
 
-| ライブラリ               | 用途                                                |
-| ------------------------ | --------------------------------------------------- |
-| openid-client            | OIDC認証フロー全体（Discovery、トークン交換、検証） |
-| @aws-sdk/client-dynamodb | DynamoDBへのセッションデータ保存・取得・削除        |
+| ライブラリ                       | 用途                                                |
+| -------------------------------- | --------------------------------------------------- |
+| openid-client                    | OIDC認証フロー全体（Discovery、トークン交換、検証） |
+| @aws-sdk/client-dynamodb         | DynamoDBへのセッションデータ保存・取得・削除        |
+| @aws-sdk/client-secrets-manager  | Secrets Managerからシークレット取得                 |
+| @aws-sdk/client-ssm              | SSM Parameter StoreからCloudFront URL取得           |
 
 #### ライブラリ選定理由
 
@@ -660,13 +664,23 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 ### 4.5 環境変数
 
-| 変数名             | 説明                                            |
-| ------------------ | ----------------------------------------------- |
-| OIDC_ISSUER        | OIDC Issuer URL（OIDC Discovery のベース URL） |
-| OIDC_CLIENT_ID     | OIDCクライアントID                              |
-| OIDC_CLIENT_SECRET | OIDCクライアントシークレット                    |
-| REDIRECT_URI       | 認証後のリダイレクトURI                         |
-| SESSION_TABLE_NAME | DynamoDBテーブル名                              |
+| 変数名                   | 説明                                                  |
+| ------------------------ | ----------------------------------------------------- |
+| OIDC_ISSUER              | OIDC Issuer URL（OIDC Discovery のベース URL）       |
+| OIDC_CLIENT_ID_KEY       | Client ID を保存した Secrets Manager のシークレット名 |
+| OIDC_CLIENT_SECRET_KEY   | Client Secret を保存した Secrets Manager のシークレット名 |
+| SSM_CLOUDFRONT_URL_PARAM | SSMパラメータ名（CloudFront URL取得用）               |
+| SESSION_TABLE_NAME       | DynamoDBテーブル名                                    |
+
+**シークレットの取得方法:**
+
+循環参照を避けるため、Client ID と Client Secret は環境変数ではなく Secrets Manager から実行時に取得します。
+`secrets.ts` の `getClientId()` / `getClientSecret()` 関数が Secrets Manager API で値を取得し、Lambda のウォームスタート時にキャッシュします。
+
+**REDIRECT_URIの取得方法:**
+
+循環参照を避けるため、REDIRECT_URIは環境変数ではなくSSM Parameter Storeから実行時に取得します。
+`ssm.ts`の`getRedirectUri()`関数がSSMからCloudFront URLを取得し、`/api/auth/callback`を付加してREDIRECT_URIを構築します。
 
 **OIDC_ISSUER の例:**
 
@@ -754,8 +768,8 @@ DynamoDBのTTLは即座に削除されるわけではありません（最大48�
 
 ### 5.2 学習用途のため簡略化した項目
 
-| 項目                     | 本番環境での推奨       | 今回の対応     |
-| ------------------------ | ---------------------- | -------------- |
-| クライアントシークレット | Secrets Manager で管理 | 環境変数で保持 |
-| Rate Limiting            | API Gatewayで制限      | なし           |
-| WAF                      | 有効化                 | なし           |
+| 項目                     | 本番環境での推奨       | 今回の対応                  |
+| ------------------------ | ---------------------- | --------------------------- |
+| クライアントシークレット | Secrets Manager で管理 | ✅ Secrets Manager で管理   |
+| Rate Limiting            | CloudFront/WAFで制限   | なし                        |
+| WAF                      | 有効化                 | なし                        |

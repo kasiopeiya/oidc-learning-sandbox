@@ -12,7 +12,9 @@
  *
  * これにより、Cognito以外のOP（Auth0、Keycloak、Google等）にも対応可能。
  */
-import * as client from 'openid-client';
+import * as client from 'openid-client'
+
+import { getClientId, getClientSecret } from './secrets'
 
 /**
  * OIDC Configuration のキャッシュ
@@ -30,34 +32,34 @@ let cachedConfig: client.Configuration | null = null;
 let cachedIssuer: string | null = null;
 
 /**
- * 環境変数から OIDC 設定を取得
+ * OIDC 設定を取得
+ *
+ * - OIDC_ISSUER は環境変数から取得
+ * - Client ID と Client Secret は Secrets Manager から取得（循環参照回避のため）
+ * - REDIRECT_URI は SSM Parameter Store から取得（ssm.ts の getRedirectUri() を使用）
  *
  * @returns OIDC 設定オブジェクト
- * @throws 必要な環境変数が設定されていない場合
+ * @throws 必要な設定が取得できない場合
  */
-export function getOidcEnvVars(): {
-  issuer: string;
-  clientId: string;
-  clientSecret: string;
-  redirectUri: string;
-} {
-  const issuer = process.env.OIDC_ISSUER;
-  const clientId = process.env.OIDC_CLIENT_ID;
-  const clientSecret = process.env.OIDC_CLIENT_SECRET;
-  const redirectUri = process.env.REDIRECT_URI;
+export async function getOidcEnvVars(): Promise<{
+  issuer: string
+  clientId: string
+  clientSecret: string
+}> {
+  // Issuer は環境変数から取得
+  const issuer = process.env.OIDC_ISSUER
 
-  // 必要な環境変数の存在確認
-  if (!issuer || !clientId || !clientSecret || !redirectUri) {
-    console.error('Missing required OIDC environment variables', {
-      OIDC_ISSUER: issuer ? 'set' : 'not set',
-      OIDC_CLIENT_ID: clientId ? 'set' : 'not set',
-      OIDC_CLIENT_SECRET: clientSecret ? 'set' : 'not set',
-      REDIRECT_URI: redirectUri ? 'set' : 'not set',
-    });
-    throw new Error('Missing required OIDC environment variables');
+  if (!issuer) {
+    console.error('OIDC_ISSUER environment variable is not set')
+    throw new Error('OIDC_ISSUER environment variable is not set')
   }
 
-  return { issuer, clientId, clientSecret, redirectUri };
+  // Client ID と Client Secret は Secrets Manager から取得
+  // Lambda 環境変数に平文のシークレットを保存しないためのセキュリティ対策
+  const clientId = await getClientId()
+  const clientSecret = await getClientSecret()
+
+  return { issuer, clientId, clientSecret }
 }
 
 /**
@@ -70,16 +72,17 @@ export function getOidcEnvVars(): {
  * @throws Discovery に失敗した場合
  */
 export async function getOidcConfig(): Promise<client.Configuration> {
-  const { issuer, clientId, clientSecret } = getOidcEnvVars();
+  // Secrets Manager から Client ID/Secret を取得
+  const { issuer, clientId, clientSecret } = await getOidcEnvVars()
 
   // Issuer が変更された場合はキャッシュを無効化
   if (cachedConfig && cachedIssuer === issuer) {
-    return cachedConfig;
+    return cachedConfig
   }
 
-  const issuerUrl = new URL(issuer);
+  const issuerUrl = new URL(issuer)
 
-  console.log('Starting OIDC Discovery', { issuerUrl: issuerUrl.toString() });
+  console.log('Starting OIDC Discovery', { issuerUrl: issuerUrl.toString() })
 
   // OIDC Discovery を実行
   // - /.well-known/openid-configuration にアクセス
@@ -88,13 +91,13 @@ export async function getOidcConfig(): Promise<client.Configuration> {
     issuerUrl,
     clientId,
     clientSecret // ClientSecretPost がデフォルトで使用される
-  );
+  )
 
-  cachedIssuer = issuer;
+  cachedIssuer = issuer
 
-  console.log('OIDC Discovery completed');
+  console.log('OIDC Discovery completed')
 
-  return cachedConfig;
+  return cachedConfig
 }
 
 /**
@@ -106,16 +109,16 @@ export async function getOidcConfig(): Promise<client.Configuration> {
  * @throws Discovery に失敗した場合、または認可エンドポイントが存在しない場合
  */
 export async function getAuthorizationEndpoint(): Promise<string> {
-  const config = await getOidcConfig();
+  const config = await getOidcConfig()
 
   // ServerMetadata から authorization_endpoint を取得
-  const authorizationEndpoint = config.serverMetadata().authorization_endpoint;
+  const authorizationEndpoint = config.serverMetadata().authorization_endpoint
 
   if (!authorizationEndpoint) {
-    throw new Error('authorization_endpoint not found in OIDC Discovery');
+    throw new Error('authorization_endpoint not found in OIDC Discovery')
   }
 
-  return authorizationEndpoint;
+  return authorizationEndpoint
 }
 
 /**
@@ -127,22 +130,22 @@ export async function getAuthorizationEndpoint(): Promise<string> {
  * @throws Discovery に失敗した場合、または UserInfo エンドポイントが存在しない場合
  */
 export async function getUserInfoEndpoint(): Promise<string> {
-  const config = await getOidcConfig();
+  const config = await getOidcConfig()
 
   // ServerMetadata から userinfo_endpoint を取得
-  const userInfoEndpoint = config.serverMetadata().userinfo_endpoint;
+  const userInfoEndpoint = config.serverMetadata().userinfo_endpoint
 
   if (!userInfoEndpoint) {
-    throw new Error('userinfo_endpoint not found in OIDC Discovery');
+    throw new Error('userinfo_endpoint not found in OIDC Discovery')
   }
 
-  return userInfoEndpoint;
+  return userInfoEndpoint
 }
 
 /**
  * キャッシュをクリア（テスト用）
  */
 export function clearConfigCache(): void {
-  cachedConfig = null;
-  cachedIssuer = null;
+  cachedConfig = null
+  cachedIssuer = null
 }

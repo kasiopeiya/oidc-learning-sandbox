@@ -35,6 +35,7 @@ import {
   generateSessionId,
   saveSession,
 } from '../utils/session';
+import { getRedirectUri } from '../utils/ssm';
 
 /**
  * 認可リクエストで使用するOAuthスコープ
@@ -111,10 +112,13 @@ export const handler = async (
   let redirectUri: string;
 
   try {
-    // 環境変数から OIDC 設定を取得
-    const envVars = getOidcEnvVars();
-    clientId = envVars.clientId;
-    redirectUri = envVars.redirectUri;
+    // OIDC 設定を取得（Client ID/Secret は Secrets Manager から取得）
+    const envVars = await getOidcEnvVars()
+    clientId = envVars.clientId
+
+    // SSM Parameter Store から REDIRECT_URI を取得
+    // 循環参照を避けるため、CloudFront URL は SSM に保存されている
+    redirectUri = await getRedirectUri();
 
     // OIDC Discovery を実行して認可エンドポイントを取得
     // これにより、OP が Cognito、Auth0、Keycloak 等に関わらず動作する

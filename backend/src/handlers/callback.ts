@@ -32,6 +32,7 @@ import {
   getSessionIdFromCookie,
   saveAuthenticatedSession,
 } from '../utils/session';
+import { getRedirectUri } from '../utils/ssm';
 
 /**
  * エラーコードの定義
@@ -285,7 +286,8 @@ export const handler = async (
 
   try {
     // コールバックURLを構築（認可レスポンスのパラメータを含む）
-    const redirectUri = process.env.REDIRECT_URI!;
+    // SSM Parameter Store から CloudFront URL を取得してリダイレクト URI を構築
+    const redirectUri = await getRedirectUri();
     const callbackUrl = new URL(redirectUri);
     callbackUrl.searchParams.set('code', code);
     callbackUrl.searchParams.set('state', event.queryStringParameters?.state || '');
