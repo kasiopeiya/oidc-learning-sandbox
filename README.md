@@ -229,6 +229,48 @@ npm run test:ui
 npx playwright show-report
 ```
 
+### 単体テスト（Vitest）
+
+バックエンドとフロントエンドの単体テストを実行できます。
+
+#### バックエンドテスト
+
+```bash
+cd backend
+
+# テスト実行
+npm test
+
+# ウォッチモード
+npm run test:watch
+
+# UI付きテスト
+npm run test:ui
+
+# カバレッジレポート生成
+npm run test:coverage
+```
+
+#### フロントエンドテスト
+
+```bash
+cd frontend
+
+# テスト実行
+npm test
+
+# ウォッチモード
+npm run test:watch
+
+# UI付きテスト
+npm run test:ui
+
+# カバレッジレポート生成
+npm run test:coverage
+```
+
+詳細は [テスト戦略](./docs/testing-strategy.md) を参照してください。
+
 ## ディレクトリ構成
 
 ```
