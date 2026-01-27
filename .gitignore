@@ -6,6 +6,7 @@ dist/
 build/
 *.js.map
 *.d.ts
+!**/vite-env.d.ts
 
 # CDK
 cdk.out/
