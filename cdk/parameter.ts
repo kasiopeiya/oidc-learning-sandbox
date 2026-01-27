@@ -8,11 +8,11 @@
  */
 export interface AppParameter {
   /** 環境名（dev, prod など） */
-  envName: string;
+  envName: string
   /** プロジェクト名 */
-  projectName: string;
+  projectName: string
   /** AWSリージョン */
-  region: string;
+  region: string
 }
 
 /**
@@ -21,5 +21,5 @@ export interface AppParameter {
 export const devParameter: AppParameter = {
   envName: 'dev',
   projectName: 'oidc-sandbox',
-  region: 'ap-northeast-1',
-};
+  region: 'ap-northeast-1'
+}

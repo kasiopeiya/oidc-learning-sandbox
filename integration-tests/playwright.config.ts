@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test'
 
 /**
  * Playwright設定ファイル
@@ -38,7 +38,7 @@ export default defineConfig({
     trace: 'on-first-retry',
 
     // スクリーンショット（失敗時のみ）
-    screenshot: 'only-on-failure',
+    screenshot: 'only-on-failure'
   },
 
   // テストタイムアウト（Cognito画面のロード待ちを考慮）
@@ -46,14 +46,14 @@ export default defineConfig({
 
   // expect のタイムアウト
   expect: {
-    timeout: 10000,
+    timeout: 10000
   },
 
   // プロジェクト設定（Chromiumのみ）
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-  ],
-});
+      use: { ...devices['Desktop Chrome'] }
+    }
+  ]
+})

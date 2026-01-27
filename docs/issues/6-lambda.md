@@ -19,7 +19,7 @@
 - [ ] `backend/` ディレクトリ構成が設計書通りに作成されている
 - [ ] NodejsFunctionでLambda関数が定義されている
 - [ ] ランタイムがNode.js 24.x、アーキテクチャがarm64に設定されている
-- [ ] 環境変数（COGNITO_*, REDIRECT_URI, FRONTEND_URL）が設定されている
+- [ ] 環境変数（COGNITO\_\*, REDIRECT_URI, FRONTEND_URL）が設定されている
 - [ ] `/api/auth/login` と `/api/auth/callback` のルートが定義されている
 - [ ] デプロイ後、エンドポイントにアクセスして200/302レスポンスが返る
 

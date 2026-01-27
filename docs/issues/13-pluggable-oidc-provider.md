@@ -6,6 +6,7 @@
 OIDCの標準仕様に準拠することで、Cognito以外のOP（Auth0、Keycloak、Google等）にも容易に差し替えられるようにする。
 
 これにより:
+
 - 異なるOPでのOIDC認証フローを比較学習できる
 - RP実装がOIDC標準に準拠していることを確認できる
 - 実務で様々なOPと連携する際の参考になる
@@ -16,6 +17,7 @@ OIDCの標準仕様に準拠することで、Cognito以外のOP（Auth0、Keycl
 ### 現状の課題
 
 **CDK（環境変数）**
+
 ```typescript
 environment: {
   COGNITO_USER_POOL_ID: ...,    // Cognito固有
@@ -26,19 +28,23 @@ environment: {
 ```
 
 **login.ts**
+
 - `COGNITO_DOMAIN`、`COGNITO_CLIENT_ID` を使用
 - 認可エンドポイント: `${cognitoDomain}/oauth2/authorize`（Cognitoのパス構造を前提）
 
 **callback.ts**
+
 - Issuer URL: `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`（Cognito固有の形式）
 - `COGNITO_USER_POOL_ID`、`COGNITO_CLIENT_ID`、`COGNITO_CLIENT_SECRET` を使用
 
 **account.ts**
+
 - UserInfo URL: `${cognitoDomain}/oauth2/userInfo`（Cognitoのパス構造を前提）
 
 ### スコープ / 作業項目
 
 **環境変数の標準化（CDK）**
+
 - Cognito固有の環境変数名をOIDC標準の用語に変更
   - `COGNITO_USER_POOL_ID` → 削除（Issuerから自動取得）
   - `COGNITO_CLIENT_ID` → `OIDC_CLIENT_ID`
@@ -46,6 +52,7 @@ environment: {
   - `COGNITO_DOMAIN` → `OIDC_ISSUER`（Issuer URL）
 
 **バックエンド: OIDC Discovery対応**
+
 - `backend/src/utils/oidc-config.ts` を新規作成
   - openid-client の Configuration をモジュール間で共有
   - Discovery結果（authorization_endpoint、token_endpoint、userinfo_endpoint）をキャッシュ
@@ -61,10 +68,12 @@ environment: {
   - Cognito固有のURL構築ロジックを削除
 
 **CDK修正**
+
 - `cdk/lib/oidc-sandbox-stack.ts` の環境変数を更新
 - Cognito Issuer URLの構築を一箇所に集約
 
 **コメント・ドキュメント更新**
+
 - 各ファイルのコメントから「Cognito」固有の記述を汎用化
 - `docs/backend-design.md` に OIDC Discovery の説明を追加
 - `docs/requirements.md` の将来機能から本項目を削除
@@ -105,12 +114,12 @@ openid-client ライブラリの `client.discovery()` を使用すれば、こ�
 
 ### 対象ファイル
 
-| 操作 | ファイル |
-|------|----------|
+| 操作 | ファイル                           |
+| ---- | ---------------------------------- |
 | 新規 | `backend/src/utils/oidc-config.ts` |
-| 修正 | `backend/src/handlers/login.ts` |
+| 修正 | `backend/src/handlers/login.ts`    |
 | 修正 | `backend/src/handlers/callback.ts` |
-| 修正 | `backend/src/handlers/account.ts` |
-| 修正 | `cdk/lib/oidc-sandbox-stack.ts` |
-| 修正 | `docs/backend-design.md` |
-| 修正 | `docs/requirements.md` |
+| 修正 | `backend/src/handlers/account.ts`  |
+| 修正 | `cdk/lib/oidc-sandbox-stack.ts`    |
+| 修正 | `docs/backend-design.md`           |
+| 修正 | `docs/requirements.md`             |

@@ -12,5 +12,5 @@ globs: frontend/**/*
 // 1. サードパーティライブラリ（該当する場合）
 
 // 2. 自作モジュール
-import { redirectToLogin } from './auth';
+import { redirectToLogin } from './auth'
 ```

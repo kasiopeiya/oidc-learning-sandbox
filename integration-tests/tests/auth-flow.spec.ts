@@ -8,51 +8,47 @@
  * - 口座番号の表示確認
  * - テストユーザーの削除（クリーンアップ）
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 
-import {
-  createTestUser,
-  deleteTestUser,
-  generateTestEmail,
-} from '../setup/test-user';
+import { createTestUser, deleteTestUser, generateTestEmail } from '../setup/test-user'
 
 /**
  * テストユーザーの認証情報
  */
-const TEST_PASSWORD = 'TestPassword123!';
+const TEST_PASSWORD = 'TestPassword123!'
 
 test.describe('AUTH-001: 認証フロー完全E2Eテスト', () => {
   /** テストユーザーのメールアドレス */
-  let testEmail: string;
+  let testEmail: string
 
   /**
    * テスト前処理: テストユーザーを作成
    */
   test.beforeEach(async () => {
     // ユニークなテストメールアドレスを生成
-    testEmail = generateTestEmail();
+    testEmail = generateTestEmail()
 
-    console.log(`🔧 テストユーザーを作成中: ${testEmail}`);
+    console.log(`🔧 テストユーザーを作成中: ${testEmail}`)
 
     // Cognito Admin API でテストユーザーを作成
     // - メール確認をスキップ（email_verified: true）
     // - 初回ログイン時のパスワード変更をスキップ（Permanent: true）
-    await createTestUser(testEmail, TEST_PASSWORD);
+    await createTestUser(testEmail, TEST_PASSWORD)
 
-    console.log(`✅ テストユーザー作成完了: ${testEmail}`);
-  });
+    console.log(`✅ テストユーザー作成完了: ${testEmail}`)
+  })
 
   /**
    * テスト後処理: テストユーザーを削除
    */
   test.afterEach(async () => {
-    console.log(`🧹 テストユーザーを削除中: ${testEmail}`);
+    console.log(`🧹 テストユーザーを削除中: ${testEmail}`)
 
     // Cognito Admin API でテストユーザーを削除
-    await deleteTestUser(testEmail);
+    await deleteTestUser(testEmail)
 
-    console.log(`✅ テストユーザー削除完了: ${testEmail}`);
-  });
+    console.log(`✅ テストユーザー削除完了: ${testEmail}`)
+  })
 
   /**
    * ログインから口座番号表示までの完全なフローをテスト
@@ -69,111 +65,111 @@ test.describe('AUTH-001: 認証フロー完全E2Eテスト', () => {
     // ============================================================
     // Step 1: トップページにアクセス
     // ============================================================
-    console.log('📍 Step 1: トップページにアクセス');
+    console.log('📍 Step 1: トップページにアクセス')
 
-    await page.goto('/');
-    await expect(page).toHaveTitle('OIDC学習サンドボックス');
+    await page.goto('/')
+    await expect(page).toHaveTitle('OIDC学習サンドボックス')
 
     // 「口座作成」ボタンが表示されていることを確認
-    const loginButton = page.getByRole('button', { name: '口座作成' });
-    await expect(loginButton).toBeVisible();
+    const loginButton = page.getByRole('button', { name: '口座作成' })
+    await expect(loginButton).toBeVisible()
 
     // ============================================================
     // Step 2: 「口座作成」ボタンをクリック
     // ============================================================
-    console.log('📍 Step 2: 「口座作成」ボタンをクリック');
+    console.log('📍 Step 2: 「口座作成」ボタンをクリック')
 
     // ボタンクリック後、Cognitoにリダイレクトされるのを待つ
-    await loginButton.click();
+    await loginButton.click()
 
     // Cognito ホスト UI にリダイレクトされるまで待機
     // URLに「amazoncognito.com」が含まれることを確認
-    await page.waitForURL(/amazoncognito\.com/);
+    await page.waitForURL(/amazoncognito\.com/)
 
-    console.log('✅ Cognito ホスト UI にリダイレクトされました');
+    console.log('✅ Cognito ホスト UI にリダイレクトされました')
 
     // ============================================================
     // Step 3: Cognitoログインフォームに入力
     // ============================================================
-    console.log('📍 Step 3: Cognitoログインフォームに入力');
+    console.log('📍 Step 3: Cognitoログインフォームに入力')
 
     // Cognito UIには複数のフォーム（Sign in / Sign up）が存在するため、
     // 可視のサインインフォームコンテナを特定してから入力フィールドを探す
     // フォームが表示されるまで待機
-    await page.waitForSelector('input[placeholder="name@host.com"]:visible', { timeout: 10000 });
+    await page.waitForSelector('input[placeholder="name@host.com"]:visible', { timeout: 10000 })
 
     // メールアドレスを入力
-    const usernameInput = page.locator('input[placeholder="name@host.com"]:visible');
-    await usernameInput.fill(testEmail);
+    const usernameInput = page.locator('input[placeholder="name@host.com"]:visible')
+    await usernameInput.fill(testEmail)
 
     // パスワードを入力
-    const passwordInput = page.locator('input[placeholder="Password"]:visible');
-    await passwordInput.fill(TEST_PASSWORD);
+    const passwordInput = page.locator('input[placeholder="Password"]:visible')
+    await passwordInput.fill(TEST_PASSWORD)
 
     // ============================================================
     // Step 4: ログインボタンをクリック
     // ============================================================
-    console.log('📍 Step 4: ログインボタンをクリック');
+    console.log('📍 Step 4: ログインボタンをクリック')
 
     // Cognitoのログインボタン（可視のもの）をクリック
-    const submitButton = page.locator('input[name="signInSubmitButton"]:visible');
-    await submitButton.click();
+    const submitButton = page.locator('input[name="signInSubmitButton"]:visible')
+    await submitButton.click()
 
     // ============================================================
     // Step 5: /callback にリダイレクトされるのを待機
     // ============================================================
-    console.log('📍 Step 5: /callback にリダイレクトされるのを待機');
+    console.log('📍 Step 5: /callback にリダイレクトされるのを待機')
 
     // CloudFront の URL に戻り、/callback パスにリダイレクトされるのを待つ
-    await page.waitForURL(/\/callback$/);
+    await page.waitForURL(/\/callback$/)
 
-    console.log('✅ /callback にリダイレクトされました');
+    console.log('✅ /callback にリダイレクトされました')
 
     // ============================================================
     // Step 6: 認証成功画面の表示を確認
     // ============================================================
-    console.log('📍 Step 6: 認証成功画面の表示を確認');
+    console.log('📍 Step 6: 認証成功画面の表示を確認')
 
     // 「認証成功」ヘッダーが表示されることを確認
-    await expect(page.getByText('認証成功')).toBeVisible();
+    await expect(page.getByText('認証成功')).toBeVisible()
 
     // ============================================================
     // Step 7: ユーザー情報が表示されることを確認
     // ============================================================
-    console.log('📍 Step 7: ユーザー情報が表示されることを確認');
+    console.log('📍 Step 7: ユーザー情報が表示されることを確認')
 
     // メールアドレスが表示されることを確認
     // テストユーザーのメールアドレスが実際に表示される
-    await expect(page.getByText(testEmail)).toBeVisible();
+    await expect(page.getByText(testEmail)).toBeVisible()
 
     // ============================================================
     // Step 8: 口座番号が表示されることを確認
     // ============================================================
-    console.log('📍 Step 8: 口座番号が表示されることを確認');
+    console.log('📍 Step 8: 口座番号が表示されることを確認')
 
     // 「口座情報」セクションが表示されることを確認
-    await expect(page.getByText('口座情報')).toBeVisible();
+    await expect(page.getByText('口座情報')).toBeVisible()
 
     // 「口座番号」ラベルが表示されることを確認
-    await expect(page.getByText('口座番号')).toBeVisible();
+    await expect(page.getByText('口座番号')).toBeVisible()
 
     // 口座番号（10桁の数字）が表示されることを確認
     // 口座番号は10桁の数字で、青色のテキストで表示される
-    const accountNumberElement = page.locator('.text-blue-600.font-mono');
-    await expect(accountNumberElement).toBeVisible();
+    const accountNumberElement = page.locator('.text-blue-600.font-mono')
+    await expect(accountNumberElement).toBeVisible()
 
     // 口座番号の形式を検証（10桁の数字）
-    const accountNumber = await accountNumberElement.textContent();
-    expect(accountNumber).toMatch(/^\d{10}$/);
+    const accountNumber = await accountNumberElement.textContent()
+    expect(accountNumber).toMatch(/^\d{10}$/)
 
-    console.log(`✅ 口座番号が表示されました: ${accountNumber}`);
+    console.log(`✅ 口座番号が表示されました: ${accountNumber}`)
 
     // ============================================================
     // テスト成功
     // ============================================================
-    console.log('🎉 認証フローE2Eテスト完了');
-  });
-});
+    console.log('🎉 認証フローE2Eテスト完了')
+  })
+})
 
 test.describe('AUTH-002: 認証エラーテスト', () => {
   /**
@@ -183,41 +179,41 @@ test.describe('AUTH-002: 認証エラーテスト', () => {
     // ============================================================
     // Step 1: トップページにアクセスして「口座作成」ボタンをクリック
     // ============================================================
-    await page.goto('/');
-    const loginButton = page.getByRole('button', { name: '口座作成' });
-    await loginButton.click();
+    await page.goto('/')
+    const loginButton = page.getByRole('button', { name: '口座作成' })
+    await loginButton.click()
 
     // Cognito ホスト UI にリダイレクトされるまで待機
-    await page.waitForURL(/amazoncognito\.com/);
+    await page.waitForURL(/amazoncognito\.com/)
 
     // ============================================================
     // Step 2: 存在しないユーザーでログインを試みる
     // ============================================================
-    await page.waitForSelector('input[placeholder="name@host.com"]:visible', { timeout: 10000 });
+    await page.waitForSelector('input[placeholder="name@host.com"]:visible', { timeout: 10000 })
 
     // 存在しないメールアドレスを入力
-    const usernameInput = page.locator('input[placeholder="name@host.com"]:visible');
-    await usernameInput.fill('nonexistent-user@example.com');
+    const usernameInput = page.locator('input[placeholder="name@host.com"]:visible')
+    await usernameInput.fill('nonexistent-user@example.com')
 
     // 適当なパスワードを入力
-    const passwordInput = page.locator('input[placeholder="Password"]:visible');
-    await passwordInput.fill('WrongPassword123!');
+    const passwordInput = page.locator('input[placeholder="Password"]:visible')
+    await passwordInput.fill('WrongPassword123!')
 
     // ログインボタンをクリック
-    const submitButton = page.locator('input[name="signInSubmitButton"]:visible');
-    await submitButton.click();
+    const submitButton = page.locator('input[name="signInSubmitButton"]:visible')
+    await submitButton.click()
 
     // ============================================================
     // Step 3: エラーメッセージが表示されることを確認
     // ============================================================
     // Cognito ホスト UI でエラーメッセージが表示される
     // 「User does not exist」または類似のメッセージ
-    const errorMessage = page.locator('#loginErrorMessage:visible');
-    await expect(errorMessage).toBeVisible({ timeout: 10000 });
+    const errorMessage = page.locator('#loginErrorMessage:visible')
+    await expect(errorMessage).toBeVisible({ timeout: 10000 })
 
     // エラーメッセージの内容を確認
-    await expect(errorMessage).toContainText(/User does not exist|Incorrect username or password/);
+    await expect(errorMessage).toContainText(/User does not exist|Incorrect username or password/)
 
-    console.log('✅ 存在しないユーザーでログイン時にエラーが表示されることを確認');
-  });
-});
+    console.log('✅ 存在しないユーザーでログイン時にエラーが表示されることを確認')
+  })
+})

@@ -23,19 +23,12 @@
  * - サーバーサイドで一元管理できる
  * - TTLで自動削除される
  */
-import {
-  APIGatewayProxyEventV2,
-  APIGatewayProxyResultV2,
-} from 'aws-lambda';
+import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
 
-import { getAuthorizationEndpoint, getOidcEnvVars } from '../utils/oidc-config';
-import { generateOidcSecurityParams } from '../utils/pkce';
-import {
-  createSessionCookie,
-  generateSessionId,
-  saveSession,
-} from '../utils/session';
-import { getRedirectUri } from '../utils/ssm';
+import { getAuthorizationEndpoint, getOidcEnvVars } from '../utils/oidc-config'
+import { generateOidcSecurityParams } from '../utils/pkce'
+import { createSessionCookie, generateSessionId, saveSession } from '../utils/session'
+import { getRedirectUri } from '../utils/ssm'
 
 /**
  * 認可リクエストで使用するOAuthスコープ
@@ -44,7 +37,7 @@ import { getRedirectUri } from '../utils/ssm';
  * - email: メールアドレスを取得
  * - profile: プロフィール情報（名前など）を取得
  */
-const OAUTH_SCOPES = 'openid email profile';
+const OAUTH_SCOPES = 'openid email profile'
 
 /**
  * ログインエンドポイントのハンドラー
@@ -55,13 +48,11 @@ const OAUTH_SCOPES = 'openid email profile';
  * @param event - API Gateway HTTP API (v2) からのイベント
  * @returns 302 リダイレクトレスポンス（OP 認可エンドポイントへ）
  */
-export const handler = async (
-  event: APIGatewayProxyEventV2
-): Promise<APIGatewayProxyResultV2> => {
+export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
   console.log('Login handler invoked', {
     path: event.rawPath,
-    method: event.requestContext.http.method,
-  });
+    method: event.requestContext.http.method
+  })
 
   // ============================================================
   // Step 1: セッションIDとセキュリティパラメータの生成
@@ -69,22 +60,22 @@ export const handler = async (
 
   // セッションIDを生成（256ビットのランダム文字列）
   // このIDをCookieに保存し、DynamoDBのキーとして使用
-  const sessionId = generateSessionId();
+  const sessionId = generateSessionId()
 
   // state, nonce, code_verifier, code_challenge を一括生成
   // - state: CSRF攻撃対策（DynamoDBに保存 → 認可URLに含める → コールバックで照合）
   // - nonce: リプレイ攻撃対策（DynamoDBに保存 → 認可URLに含める → IDトークン内のnonceと照合）
   // - code_verifier: PKCE用の秘密鍵（DynamoDBに保存 → トークン交換時に送信）
   // - code_challenge: code_verifierのSHA256ハッシュ（認可URLに含める）
-  const { state, nonce, codeVerifier, codeChallenge } = generateOidcSecurityParams();
+  const { state, nonce, codeVerifier, codeChallenge } = generateOidcSecurityParams()
 
   console.log('Session and security parameters generated', {
     sessionIdLength: sessionId.length,
     stateLength: state.length,
     nonceLength: nonce.length,
     codeVerifierLength: codeVerifier.length,
-    codeChallengeLength: codeChallenge.length,
-  });
+    codeChallengeLength: codeChallenge.length
+  })
 
   // ============================================================
   // Step 2: セッションデータをDynamoDBに保存
@@ -93,23 +84,23 @@ export const handler = async (
   // セッションIDをキーにして、セキュリティパラメータをDynamoDBに保存
   // TTL（5分）が設定され、自動的に削除される
   try {
-    await saveSession(sessionId, { state, nonce, codeVerifier });
+    await saveSession(sessionId, { state, nonce, codeVerifier })
   } catch (error) {
-    console.error('Failed to save session to DynamoDB', error);
+    console.error('Failed to save session to DynamoDB', error)
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Failed to initialize session' }),
-    };
+      body: JSON.stringify({ error: 'Failed to initialize session' })
+    }
   }
 
   // ============================================================
   // Step 3: OIDC Discovery から認可エンドポイントを取得
   // ============================================================
 
-  let authorizeEndpoint: string;
-  let clientId: string;
-  let redirectUri: string;
+  let authorizeEndpoint: string
+  let clientId: string
+  let redirectUri: string
 
   try {
     // OIDC 設定を取得（Client ID/Secret は Secrets Manager から取得）
@@ -118,18 +109,18 @@ export const handler = async (
 
     // SSM Parameter Store から REDIRECT_URI を取得
     // 循環参照を避けるため、CloudFront URL は SSM に保存されている
-    redirectUri = await getRedirectUri();
+    redirectUri = await getRedirectUri()
 
     // OIDC Discovery を実行して認可エンドポイントを取得
     // これにより、OP が Cognito、Auth0、Keycloak 等に関わらず動作する
-    authorizeEndpoint = await getAuthorizationEndpoint();
+    authorizeEndpoint = await getAuthorizationEndpoint()
   } catch (error) {
-    console.error('Failed to get OIDC configuration', error);
+    console.error('Failed to get OIDC configuration', error)
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Server configuration error' }),
-    };
+      body: JSON.stringify({ error: 'Server configuration error' })
+    }
   }
 
   // ============================================================
@@ -169,16 +160,16 @@ export const handler = async (
 
     // code_challenge_method: PKCEのハッシュ方式
     // S256 = SHA256 + Base64URL（推奨方式）
-    code_challenge_method: 'S256',
-  });
+    code_challenge_method: 'S256'
+  })
 
   // 最終的な認可URL
-  const authorizationUrl = `${authorizeEndpoint}?${queryParams.toString()}`;
+  const authorizationUrl = `${authorizeEndpoint}?${queryParams.toString()}`
 
   console.log('Authorization URL constructed', {
     authorizeEndpoint,
-    redirectUri,
-  });
+    redirectUri
+  })
 
   // ============================================================
   // Step 5: セッションCookieの設定と302リダイレクト
@@ -189,17 +180,17 @@ export const handler = async (
   // - HttpOnly: JavaScriptからアクセス不可（XSS対策）
   // - Secure: HTTPS接続でのみ送信
   // - SameSite=Lax: OPからのリダイレクト時にCookieが送信されるよう設定
-  const sessionCookie = createSessionCookie(sessionId);
+  const sessionCookie = createSessionCookie(sessionId)
 
   // 302 Found でOPの認可エンドポイントにリダイレクト
   // API Gateway HTTP API (v2) では cookies 配列を使用してCookieを設定
   return {
     statusCode: 302,
     headers: {
-      Location: authorizationUrl,
+      Location: authorizationUrl
     },
     // HTTP API v2 形式: セッションIDのみをCookieに保存
     cookies: [sessionCookie],
-    body: '',
-  };
-};
+    body: ''
+  }
+}

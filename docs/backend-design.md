@@ -564,12 +564,12 @@ Issuer URL から `/.well-known/openid-configuration` にアクセスするこ�
 
 ### 4.3 使用ライブラリ
 
-| ライブラリ                       | 用途                                                |
-| -------------------------------- | --------------------------------------------------- |
-| openid-client                    | OIDC認証フロー全体（Discovery、トークン交換、検証） |
-| @aws-sdk/client-dynamodb         | DynamoDBへのセッションデータ保存・取得・削除        |
-| @aws-sdk/client-secrets-manager  | Secrets Managerからシークレット取得                 |
-| @aws-sdk/client-ssm              | SSM Parameter StoreからCloudFront URL取得           |
+| ライブラリ                      | 用途                                                |
+| ------------------------------- | --------------------------------------------------- |
+| openid-client                   | OIDC認証フロー全体（Discovery、トークン交換、検証） |
+| @aws-sdk/client-dynamodb        | DynamoDBへのセッションデータ保存・取得・削除        |
+| @aws-sdk/client-secrets-manager | Secrets Managerからシークレット取得                 |
+| @aws-sdk/client-ssm             | SSM Parameter StoreからCloudFront URL取得           |
 
 #### ライブラリ選定理由
 
@@ -664,13 +664,13 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 ### 4.5 環境変数
 
-| 変数名                   | 説明                                                  |
-| ------------------------ | ----------------------------------------------------- |
-| OIDC_ISSUER              | OIDC Issuer URL（OIDC Discovery のベース URL）       |
-| OIDC_CLIENT_ID_KEY       | Client ID を保存した Secrets Manager のシークレット名 |
+| 変数名                   | 説明                                                      |
+| ------------------------ | --------------------------------------------------------- |
+| OIDC_ISSUER              | OIDC Issuer URL（OIDC Discovery のベース URL）            |
+| OIDC_CLIENT_ID_KEY       | Client ID を保存した Secrets Manager のシークレット名     |
 | OIDC_CLIENT_SECRET_KEY   | Client Secret を保存した Secrets Manager のシークレット名 |
-| SSM_CLOUDFRONT_URL_PARAM | SSMパラメータ名（CloudFront URL取得用）               |
-| SESSION_TABLE_NAME       | DynamoDBテーブル名                                    |
+| SSM_CLOUDFRONT_URL_PARAM | SSMパラメータ名（CloudFront URL取得用）                   |
+| SESSION_TABLE_NAME       | DynamoDBテーブル名                                        |
 
 **シークレットの取得方法:**
 
@@ -768,8 +768,8 @@ DynamoDBのTTLは即座に削除されるわけではありません（最大48�
 
 ### 5.2 学習用途のため簡略化した項目
 
-| 項目                     | 本番環境での推奨       | 今回の対応                  |
-| ------------------------ | ---------------------- | --------------------------- |
-| クライアントシークレット | Secrets Manager で管理 | ✅ Secrets Manager で管理   |
-| Rate Limiting            | CloudFront/WAFで制限   | なし                        |
-| WAF                      | 有効化                 | なし                        |
+| 項目                     | 本番環境での推奨       | 今回の対応                |
+| ------------------------ | ---------------------- | ------------------------- |
+| クライアントシークレット | Secrets Manager で管理 | ✅ Secrets Manager で管理 |
+| Rate Limiting            | CloudFront/WAFで制限   | なし                      |
+| WAF                      | 有効化                 | なし                      |

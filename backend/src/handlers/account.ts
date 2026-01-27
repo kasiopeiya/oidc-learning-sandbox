@@ -16,31 +16,28 @@
  * - UserInfoエンドポイントでトークンの有効性を検証
  * - 処理完了後にセッションを即座に削除
  */
-import * as crypto from 'crypto';
+import * as crypto from 'crypto'
 
-import {
-  APIGatewayProxyEventV2,
-  APIGatewayProxyResultV2,
-} from 'aws-lambda';
+import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
 
-import { getUserInfoEndpoint } from '../utils/oidc-config';
+import { getUserInfoEndpoint } from '../utils/oidc-config'
 import {
   createDeleteSessionCookie,
   deleteSession,
   getAuthenticatedSession,
-  getSessionIdFromCookie,
-} from '../utils/session';
+  getSessionIdFromCookie
+} from '../utils/session'
 
 /**
  * 口座作成APIのレスポンス型
  */
 interface AccountResponse {
   /** 生成された口座番号 */
-  accountNumber: string;
+  accountNumber: string
   /** ユーザーのメールアドレス */
-  email: string;
+  email: string
   /** ユーザーの一意識別子 */
-  sub: string;
+  sub: string
 }
 
 /**
@@ -48,9 +45,9 @@ interface AccountResponse {
  */
 interface ErrorResponse {
   /** エラーメッセージ */
-  error: string;
+  error: string
   /** エラーコード */
-  code: string;
+  code: string
 }
 
 /**
@@ -67,15 +64,15 @@ async function verifyTokenWithUserInfo(
 ): Promise<{ sub: string; email: string } | null> {
   // OIDC Discovery から UserInfo エンドポイントを取得
   // これにより、OP が Cognito、Auth0、Keycloak 等に関わらず動作する
-  let userInfoUrl: string;
+  let userInfoUrl: string
   try {
-    userInfoUrl = await getUserInfoEndpoint();
+    userInfoUrl = await getUserInfoEndpoint()
   } catch (error) {
-    console.error('Failed to get UserInfo endpoint from OIDC Discovery', error);
-    return null;
+    console.error('Failed to get UserInfo endpoint from OIDC Discovery', error)
+    return null
   }
 
-  console.log('Calling UserInfo endpoint', { userInfoUrl });
+  console.log('Calling UserInfo endpoint', { userInfoUrl })
 
   try {
     // UserInfoエンドポイントにアクセストークンを送信
@@ -83,34 +80,34 @@ async function verifyTokenWithUserInfo(
     const response = await fetch(userInfoUrl, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+        Authorization: `Bearer ${accessToken}`
+      }
+    })
 
     // レスポンスステータスを確認
     if (!response.ok) {
       console.error('UserInfo request failed', {
         status: response.status,
-        statusText: response.statusText,
-      });
-      return null;
+        statusText: response.statusText
+      })
+      return null
     }
 
     // ユーザー情報をパース
-    const userInfo = (await response.json()) as { sub: string; email: string };
+    const userInfo = (await response.json()) as { sub: string; email: string }
 
     console.log('UserInfo response received', {
       sub: userInfo.sub,
-      email: userInfo.email,
-    });
+      email: userInfo.email
+    })
 
     return {
       sub: userInfo.sub,
-      email: userInfo.email,
-    };
+      email: userInfo.email
+    }
   } catch (error) {
-    console.error('UserInfo request error', error);
-    return null;
+    console.error('UserInfo request error', error)
+    return null
   }
 }
 
@@ -131,19 +128,19 @@ function generateAccountNumber(): string | null {
     // 10桁のランダムな数字を生成
     // crypto.randomInt を使用して暗号論的に安全な乱数を生成
     // 範囲: 1000000000 〜 9999999999（10桁の数字）
-    const accountNumber = crypto.randomInt(1000000000, 9999999999).toString();
+    const accountNumber = crypto.randomInt(1000000000, 9999999999).toString()
 
     console.log('Account number generated', {
-      accountNumber: accountNumber.substring(0, 4) + '******', // ログには一部のみ
-    });
+      accountNumber: accountNumber.substring(0, 4) + '******' // ログには一部のみ
+    })
 
-    return accountNumber;
+    return accountNumber
   } catch (error) {
     // crypto.randomInt は以下のケースで例外を投げる可能性がある:
     // - システムエントロピーが不足している場合（非常にレアだが理論上あり得る）
     // - 引数が不正な場合（固定値なので通常は発生しない）
-    console.error('Failed to generate account number', error);
-    return null;
+    console.error('Failed to generate account number', error)
+    return null
   }
 }
 
@@ -163,11 +160,11 @@ function jsonResponse(
   return {
     statusCode,
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json'
     },
     cookies,
-    body: JSON.stringify(body),
-  };
+    body: JSON.stringify(body)
+  }
 }
 
 /**
@@ -179,112 +176,110 @@ function jsonResponse(
  * @param event - API Gateway HTTP API (v2) からのイベント
  * @returns JSONレスポンス（成功時: 口座番号、失敗時: エラー）
  */
-export const handler = async (
-  event: APIGatewayProxyEventV2
-): Promise<APIGatewayProxyResultV2> => {
+export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
   console.log('Account handler invoked', {
     path: event.rawPath,
-    method: event.requestContext.http.method,
-  });
+    method: event.requestContext.http.method
+  })
 
   // ============================================================
   // Step 1: CookieからセッションIDを取得
   // ============================================================
 
   // Cookieヘッダーを解析してセッションIDを取得
-  const cookieHeader = event.cookies?.join('; ') || '';
-  const sessionId = getSessionIdFromCookie(cookieHeader);
+  const cookieHeader = event.cookies?.join('; ') || ''
+  const sessionId = getSessionIdFromCookie(cookieHeader)
 
   console.log('Session ID from cookie', {
-    hasSessionId: !!sessionId,
-  });
+    hasSessionId: !!sessionId
+  })
 
   // セッションIDが存在しない場合は401エラー
   if (!sessionId) {
-    console.error('Missing session ID in cookie');
+    console.error('Missing session ID in cookie')
     return jsonResponse(401, {
       error: '認証が必要です',
-      code: 'missing_session',
-    });
+      code: 'missing_session'
+    })
   }
 
   // ============================================================
   // Step 2: DynamoDBからアクセストークンを取得
   // ============================================================
 
-  let accessToken: string;
-  let email: string;
-  let sub: string;
+  let accessToken: string
+  let email: string
+  let sub: string
 
   try {
-    const sessionData = await getAuthenticatedSession(sessionId);
+    const sessionData = await getAuthenticatedSession(sessionId)
 
     // セッションが存在しない場合は401エラー
     if (!sessionData) {
       console.error('Authenticated session not found', {
-        sessionId: sessionId.substring(0, 8) + '...',
-      });
+        sessionId: sessionId.substring(0, 8) + '...'
+      })
       return jsonResponse(401, {
         error: '認証が必要です。再度ログインしてください。',
-        code: 'session_not_found',
-      });
+        code: 'session_not_found'
+      })
     }
 
-    accessToken = sessionData.accessToken;
-    email = sessionData.email;
-    sub = sessionData.sub;
+    accessToken = sessionData.accessToken
+    email = sessionData.email
+    sub = sessionData.sub
 
     console.log('Access token retrieved from DynamoDB', {
-      hasAccessToken: !!accessToken,
-    });
+      hasAccessToken: !!accessToken
+    })
   } catch (error) {
-    console.error('Failed to get session from DynamoDB', error);
+    console.error('Failed to get session from DynamoDB', error)
     return jsonResponse(500, {
       error: 'セッション情報の取得に失敗しました',
-      code: 'session_error',
-    });
+      code: 'session_error'
+    })
   }
 
   // ============================================================
   // Step 3: OP の UserInfo エンドポイントでトークン検証
   // ============================================================
 
-  const userInfo = await verifyTokenWithUserInfo(accessToken);
+  const userInfo = await verifyTokenWithUserInfo(accessToken)
 
   // トークンが無効な場合は401エラー
   if (!userInfo) {
-    console.error('Token verification failed');
+    console.error('Token verification failed')
 
     // 無効なセッションを削除
     try {
-      await deleteSession(sessionId);
+      await deleteSession(sessionId)
     } catch (deleteError) {
-      console.warn('Failed to delete invalid session', deleteError);
+      console.warn('Failed to delete invalid session', deleteError)
     }
 
     return jsonResponse(
       401,
       {
         error: 'アクセストークンが無効です。再度ログインしてください。',
-        code: 'invalid_token',
+        code: 'invalid_token'
       },
       [createDeleteSessionCookie()]
-    );
+    )
   }
 
   // ============================================================
   // Step 4: 口座番号を生成
   // ============================================================
 
-  const accountNumber = generateAccountNumber();
+  const accountNumber = generateAccountNumber()
 
   // 口座番号生成に失敗した場合は500エラー
   if (!accountNumber) {
-    console.error('Account number generation failed');
+    console.error('Account number generation failed')
     return jsonResponse(500, {
       error: '口座番号の生成に失敗しました。もう一度お試しください。',
-      code: 'account_generation_error',
-    });
+      code: 'account_generation_error'
+    })
   }
 
   // ============================================================
@@ -293,11 +288,11 @@ export const handler = async (
 
   // 口座作成完了後にセッションを削除（セキュリティのため即座に無効化）
   try {
-    await deleteSession(sessionId);
-    console.log('Session deleted after account creation');
+    await deleteSession(sessionId)
+    console.log('Session deleted after account creation')
   } catch (deleteError) {
     // 削除に失敗してもTTLで自動削除されるため、警告ログのみ
-    console.warn('Failed to delete session after account creation', deleteError);
+    console.warn('Failed to delete session after account creation', deleteError)
   }
 
   // ============================================================
@@ -307,8 +302,8 @@ export const handler = async (
   console.log('Account creation successful', {
     email,
     sub,
-    accountNumber: accountNumber.substring(0, 4) + '******',
-  });
+    accountNumber: accountNumber.substring(0, 4) + '******'
+  })
 
   // セッションCookieを削除して口座情報を返却
   return jsonResponse(
@@ -316,8 +311,8 @@ export const handler = async (
     {
       accountNumber,
       email,
-      sub,
+      sub
     },
     [createDeleteSessionCookie()]
-  );
-};
+  )
+}

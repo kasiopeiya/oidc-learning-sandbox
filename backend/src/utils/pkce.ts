@@ -6,10 +6,10 @@
  *
  * また、OIDC認可コードフローで使用する state と nonce の生成機能も提供する。
  */
-import * as crypto from 'crypto';
+import * as crypto from 'crypto'
 
 /** ランダム文字列の長さ（バイト数）: 32バイト = 256ビット */
-const RANDOM_BYTES_LENGTH = 32;
+const RANDOM_BYTES_LENGTH = 32
 
 /**
  * 暗号論的に安全なランダム文字列を生成する
@@ -26,13 +26,13 @@ const RANDOM_BYTES_LENGTH = 32;
  */
 export function generateRandomString(): string {
   // 32バイト（256ビット）の暗号論的に安全なランダムバイト列を生成
-  const buffer = crypto.randomBytes(RANDOM_BYTES_LENGTH);
+  const buffer = crypto.randomBytes(RANDOM_BYTES_LENGTH)
 
   // Base64URLエンコーディング
   // 1. Base64に変換
   // 2. 「+」→「-」、「/」→「_」に置換（URLセーフ化）
   // 3. パディング「=」を削除
-  return buffer.toString('base64url');
+  return buffer.toString('base64url')
 }
 
 /**
@@ -51,7 +51,7 @@ export function generateRandomString(): string {
  * @returns 暗号論的に安全なstate値
  */
 export function generateState(): string {
-  return generateRandomString();
+  return generateRandomString()
 }
 
 /**
@@ -71,7 +71,7 @@ export function generateState(): string {
  * @returns 暗号論的に安全なnonce値
  */
 export function generateNonce(): string {
-  return generateRandomString();
+  return generateRandomString()
 }
 
 /**
@@ -91,7 +91,7 @@ export function generateNonce(): string {
  * @returns 暗号論的に安全なcode_verifier値
  */
 export function generateCodeVerifier(): string {
-  return generateRandomString();
+  return generateRandomString()
 }
 
 /**
@@ -118,10 +118,10 @@ export function generateCodeVerifier(): string {
  */
 export function generateCodeChallenge(codeVerifier: string): string {
   // SHA256ハッシュを計算
-  const hash = crypto.createHash('sha256').update(codeVerifier).digest();
+  const hash = crypto.createHash('sha256').update(codeVerifier).digest()
 
   // Base64URLエンコード
-  return hash.toString('base64url');
+  return hash.toString('base64url')
 }
 
 /**
@@ -136,20 +136,20 @@ export function generateCodeChallenge(codeVerifier: string): string {
  * @returns セキュリティパラメータのセット
  */
 export function generateOidcSecurityParams(): {
-  state: string;
-  nonce: string;
-  codeVerifier: string;
-  codeChallenge: string;
+  state: string
+  nonce: string
+  codeVerifier: string
+  codeChallenge: string
 } {
-  const state = generateState();
-  const nonce = generateNonce();
-  const codeVerifier = generateCodeVerifier();
-  const codeChallenge = generateCodeChallenge(codeVerifier);
+  const state = generateState()
+  const nonce = generateNonce()
+  const codeVerifier = generateCodeVerifier()
+  const codeChallenge = generateCodeChallenge(codeVerifier)
 
   return {
     state,
     nonce,
     codeVerifier,
-    codeChallenge,
-  };
+    codeChallenge
+  }
 }

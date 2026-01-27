@@ -4,13 +4,13 @@
  * SSM Parameter Store からパラメータを取得し、キャッシュする。
  * Lambda のウォームスタート時に再利用することで、SSM API 呼び出しを削減する。
  */
-import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
+import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm'
 
 // SSM クライアントのインスタンス（Lambda 実行間で再利用）
-const ssmClient = new SSMClient({});
+const ssmClient = new SSMClient({})
 
 // パラメータキャッシュ（パラメータ名 → 値）
-const parameterCache = new Map<string, string>();
+const parameterCache = new Map<string, string>()
 
 /**
  * SSM Parameter Store からパラメータを取得
@@ -23,34 +23,34 @@ const parameterCache = new Map<string, string>();
  */
 export async function getParameter(parameterName: string): Promise<string> {
   // キャッシュから取得を試みる
-  const cached = parameterCache.get(parameterName);
+  const cached = parameterCache.get(parameterName)
   if (cached) {
-    console.log('SSM parameter cache hit', { parameterName });
-    return cached;
+    console.log('SSM parameter cache hit', { parameterName })
+    return cached
   }
 
-  console.log('Fetching SSM parameter', { parameterName });
+  console.log('Fetching SSM parameter', { parameterName })
 
   // SSM API からパラメータを取得
   const command = new GetParameterCommand({
-    Name: parameterName,
-  });
+    Name: parameterName
+  })
 
-  const response = await ssmClient.send(command);
+  const response = await ssmClient.send(command)
 
   // パラメータが存在しない場合はエラー
   if (!response.Parameter?.Value) {
-    throw new Error(`SSM parameter not found: ${parameterName}`);
+    throw new Error(`SSM parameter not found: ${parameterName}`)
   }
 
-  const value = response.Parameter.Value;
+  const value = response.Parameter.Value
 
   // キャッシュに保存
-  parameterCache.set(parameterName, value);
+  parameterCache.set(parameterName, value)
 
-  console.log('SSM parameter fetched and cached', { parameterName });
+  console.log('SSM parameter fetched and cached', { parameterName })
 
-  return value;
+  return value
 }
 
 /**
@@ -64,12 +64,12 @@ export async function getParameter(parameterName: string): Promise<string> {
  */
 export async function getCloudFrontUrl(): Promise<string> {
   // 環境変数からパラメータ名を取得
-  const paramName = process.env.SSM_CLOUDFRONT_URL_PARAM;
+  const paramName = process.env.SSM_CLOUDFRONT_URL_PARAM
   if (!paramName) {
-    throw new Error('SSM_CLOUDFRONT_URL_PARAM environment variable is not set');
+    throw new Error('SSM_CLOUDFRONT_URL_PARAM environment variable is not set')
   }
 
-  return getParameter(paramName);
+  return getParameter(paramName)
 }
 
 /**
@@ -80,13 +80,13 @@ export async function getCloudFrontUrl(): Promise<string> {
  * @returns REDIRECT_URI（例: https://xxxx.cloudfront.net/api/auth/callback）
  */
 export async function getRedirectUri(): Promise<string> {
-  const cloudFrontUrl = await getCloudFrontUrl();
-  return `${cloudFrontUrl}/api/auth/callback`;
+  const cloudFrontUrl = await getCloudFrontUrl()
+  return `${cloudFrontUrl}/api/auth/callback`
 }
 
 /**
  * キャッシュをクリア（テスト用）
  */
 export function clearParameterCache(): void {
-  parameterCache.clear();
+  parameterCache.clear()
 }

@@ -149,7 +149,6 @@ CloudFront
    **解決策**: Secrets Manager方式
 
    Lambda関数がUserPoolClientを直接参照しないようにする:
-
    1. **ClientIdとClientSecretをSecrets Managerに保存**
       - `secretsmanager.Secret`でClientIdとClientSecretを保存
       - シークレット名は固定値（`oidc-sandbox/client-id`, `oidc-sandbox/client-secret`）
@@ -234,18 +233,18 @@ CloudFront
 
 ### 対象ファイル
 
-| 操作 | ファイル |
-|------|----------|
-| 修正 | `cdk/lib/oidc-sandbox-stack.ts` |
-| 修正 | `backend/src/handlers/login.ts` |
-| 修正 | `backend/src/handlers/callback.ts` |
-| 確認 | `backend/src/handlers/account.ts` |
+| 操作 | ファイル                                                                              |
+| ---- | ------------------------------------------------------------------------------------- |
+| 修正 | `cdk/lib/oidc-sandbox-stack.ts`                                                       |
+| 修正 | `backend/src/handlers/login.ts`                                                       |
+| 修正 | `backend/src/handlers/callback.ts`                                                    |
+| 確認 | `backend/src/handlers/account.ts`                                                     |
 | 修正 | `backend/src/utils/oidc-config.ts` (Secrets Manager経由でClientId/ClientSecretを取得) |
-| 新規 | `backend/src/utils/secrets.ts` (Secrets Manager取得ユーティリティ) |
-| 既存 | `backend/src/utils/ssm.ts` (SSMパラメータ取得ユーティリティ、変更なし) |
-| 修正 | `docs/infrastructure-design.md` |
-| 修正 | `docs/backend-design.md` |
-| 修正 | `docs/requirements.md` |
+| 新規 | `backend/src/utils/secrets.ts` (Secrets Manager取得ユーティリティ)                    |
+| 既存 | `backend/src/utils/ssm.ts` (SSMパラメータ取得ユーティリティ、変更なし)                |
+| 修正 | `docs/infrastructure-design.md`                                                       |
+| 修正 | `docs/backend-design.md`                                                              |
+| 修正 | `docs/requirements.md`                                                                |
 
 ### 参考資料
 

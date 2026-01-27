@@ -16,31 +16,31 @@ aws-cdk-lib のサービスモジュールは以下の形式で統一するこ�
 
 ```typescript
 // ✅ 正しい形式
-import { aws_s3 as s3 } from 'aws-cdk-lib';
-import { aws_lambda as lambda } from 'aws-cdk-lib';
-import { aws_cognito as cognito } from 'aws-cdk-lib';
+import { aws_s3 as s3 } from 'aws-cdk-lib'
+import { aws_lambda as lambda } from 'aws-cdk-lib'
+import { aws_cognito as cognito } from 'aws-cdk-lib'
 
 // ❌ 避けるべき形式
-import * as s3 from 'aws-cdk-lib/aws-s3';
-import { Bucket } from 'aws-cdk-lib/aws-s3';
+import * as s3 from 'aws-cdk-lib/aws-s3'
+import { Bucket } from 'aws-cdk-lib/aws-s3'
 ```
 
 ## import 順序の例
 
 ```typescript
 // 1. 標準ライブラリ
-import * as path from 'path';
+import * as path from 'path'
 
 // 2. サードパーティライブラリ（CDK 含む）
-import { Stack, StackProps, RemovalPolicy } from 'aws-cdk-lib';
-import { aws_s3 as s3 } from 'aws-cdk-lib';
-import { aws_lambda as lambda } from 'aws-cdk-lib';
-import { aws_lambda_nodejs as nodejs } from 'aws-cdk-lib';
-import { aws_cognito as cognito } from 'aws-cdk-lib';
-import { aws_apigatewayv2 as apigw } from 'aws-cdk-lib';
-import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
-import { Construct } from 'constructs';
+import { Stack, StackProps, RemovalPolicy } from 'aws-cdk-lib'
+import { aws_s3 as s3 } from 'aws-cdk-lib'
+import { aws_lambda as lambda } from 'aws-cdk-lib'
+import { aws_lambda_nodejs as nodejs } from 'aws-cdk-lib'
+import { aws_cognito as cognito } from 'aws-cdk-lib'
+import { aws_apigatewayv2 as apigw } from 'aws-cdk-lib'
+import { aws_cloudfront as cloudfront } from 'aws-cdk-lib'
+import { Construct } from 'constructs'
 
 // 3. 自作モジュール
-import { AppParameter } from '../parameter';
+import { AppParameter } from '../parameter'
 ```

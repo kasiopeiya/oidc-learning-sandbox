@@ -1,8 +1,8 @@
 // 1. サードパーティライブラリ
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom'
 
 // 2. 自作モジュール
-import { getErrorMessage } from '../utils/api';
+import { getErrorMessage } from '../utils/api'
 
 /**
  * エラー画面コンポーネント
@@ -15,11 +15,11 @@ import { getErrorMessage } from '../utils/api';
  */
 export function ErrorPage() {
   // クエリパラメータからエラーコードを取得
-  const [searchParams] = useSearchParams();
-  const errorCode = searchParams.get('error');
+  const [searchParams] = useSearchParams()
+  const errorCode = searchParams.get('error')
 
   // エラーコードに対応するメッセージを取得
-  const errorMessage = getErrorMessage(errorCode);
+  const errorMessage = getErrorMessage(errorCode)
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -35,20 +35,13 @@ export function ErrorPage() {
 
         {/* デバッグ用：エラーコード表示（学習目的） */}
         {/* 実際のプロダクション環境では表示しないことが推奨される */}
-        {errorCode && (
-          <p className="text-sm text-gray-500 mb-6">
-            エラーコード: {errorCode}
-          </p>
-        )}
+        {errorCode && <p className="text-sm text-gray-500 mb-6">エラーコード: {errorCode}</p>}
 
         {/* トップへ戻るリンク */}
-        <Link
-          to="/"
-          className="text-blue-600 hover:text-blue-800 hover:underline"
-        >
+        <Link to="/" className="text-blue-600 hover:text-blue-800 hover:underline">
           &rarr; トップへ戻る
         </Link>
       </div>
     </div>
-  );
+  )
 }

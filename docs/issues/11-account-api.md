@@ -11,10 +11,12 @@ OIDC認証完了後、アクセストークンで保護されたAPIを呼び出�
 ### スコープ / 作業項目
 
 **コールバック修正（callback.ts）**
+
 - トークン交換後、アクセストークンをDynamoDBに保存（セッションIDで紐付け）
 - セッションデータの削除タイミング調整（口座作成API呼び出し後に延期）
 
 **口座作成API新規作成（account.ts）**
+
 - CookieからセッションID取得
 - DynamoDBからアクセストークン取得
 - Cognito UserInfoエンドポイントでトークン検証
@@ -22,10 +24,12 @@ OIDC認証完了後、アクセストークンで保護されたAPIを呼び出�
 - 検証完了後のセッションデータ削除
 
 **CDK修正**
+
 - AccountFunction Lambdaの追加
 - `/api/account` POSTルートの追加
 
 **フロントエンド修正**
+
 - callback.htmlに口座番号表示エリア追加
 - ページロード時に `/api/account` を自動呼び出し
 - 成功/エラー時の表示処理
@@ -80,10 +84,10 @@ callback.htmlに口座番号表示
 
 ### 対象ファイル
 
-| 操作 | ファイル |
-|------|----------|
-| 修正 | `cdk/lib/oidc-sandbox-stack.ts` |
+| 操作 | ファイル                           |
+| ---- | ---------------------------------- |
+| 修正 | `cdk/lib/oidc-sandbox-stack.ts`    |
 | 修正 | `backend/src/handlers/callback.ts` |
-| 新規 | `backend/src/handlers/account.ts` |
-| 修正 | `frontend/src/app.ts` |
-| 修正 | `frontend/public/callback.html` |
+| 新規 | `backend/src/handlers/account.ts`  |
+| 修正 | `frontend/src/app.ts`              |
+| 修正 | `frontend/public/callback.html`    |

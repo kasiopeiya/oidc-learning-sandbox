@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
@@ -14,13 +14,13 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       reportsDirectory: './coverage',
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.d.ts']
     },
 
     // グローバルなセットアップ
     globals: true,
 
     // タイムアウト設定（ミリ秒）
-    testTimeout: 10000,
-  },
-});
+    testTimeout: 10000
+  }
+})

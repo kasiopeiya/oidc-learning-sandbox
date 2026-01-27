@@ -249,12 +249,14 @@
 ### テスト観点
 
 **正常系テスト（Happy Path）**
+
 - **ユーティリティ関数**: 正しい入力値に対する期待される出力の検証
 - **AWS SDK操作**: モックされたAWS SDKが正しく呼び出され、期待される結果を返すこと
 - **React コンポーネント**: ユーザーインタラクション、条件分岐による表示切り替え
 - **非同期処理**: Promise、async/await の正しい動作検証
 
 **異常系テスト（Error Cases）- 必須**
+
 - **不正な入力値**: null、undefined、空文字列、不正な型、境界値外の値
 - **外部サービスエラー**: AWS SDK のエラー（DynamoDB、SSM、Secrets Manager）
   - ResourceNotFoundException（リソース未存在）
@@ -272,6 +274,7 @@
 - **境界値・エッジケース**: 空配列、空オブジェクト、極端に長い文字列
 
 **テスト実装の原則**
+
 - すべての関数・コンポーネントについて、**最低1つの正常系と1つ以上の異常系**をテストする
 - エラーハンドリングロジックが存在する場合、そのすべての分岐をテストする
 - try-catchブロックがある場合、catchブロックに到達するテストを必ず作成する
@@ -285,7 +288,7 @@
    - モックの初期化とクリーンアップを各テストファイルで適切に実施
    - **異常系テスト**: `.rejects()` を使用してエラーをモック
      ```typescript
-     mockDynamoDB.on(PutItemCommand).rejects(new Error('DynamoDB Error'));
+     mockDynamoDB.on(PutItemCommand).rejects(new Error('DynamoDB Error'))
      ```
 
 2. **React Testing Library のベストプラクティス**
@@ -316,36 +319,40 @@
    - `describe` ブロックで正常系と異常系を明確に分ける
      ```typescript
      describe('functionName', () => {
-       describe('正常系', () => { /* ... */ });
-       describe('異常系', () => { /* ... */ });
-     });
+       describe('正常系', () => {
+         /* ... */
+       })
+       describe('異常系', () => {
+         /* ... */
+       })
+     })
      ```
 
 ### 対象ファイル
 
-| 操作 | ファイル |
-|------|----------|
-| 新規 | `backend/vitest.config.ts` |
-| 修正 | `backend/package.json` |
-| 新規 | `backend/src/utils/cookie.test.ts` |
-| 新規 | `backend/src/utils/pkce.test.ts` |
-| 新規 | `backend/src/utils/session.test.ts` |
-| 新規 | `backend/src/utils/ssm.test.ts` |
-| 新規 | `backend/src/utils/secrets.test.ts` |
-| 新規 | `backend/src/utils/oidc-config.test.ts` |
-| 新規 | `backend/src/handlers/login.test.ts` |
-| 新規 | `backend/src/handlers/callback.test.ts` |
-| 新規 | `backend/src/handlers/account.test.ts` |
-| 新規 | `frontend/vitest.config.ts` |
-| 修正 | `frontend/package.json` |
-| 新規 | `frontend/src/utils/api.test.ts` |
+| 操作 | ファイル                                     |
+| ---- | -------------------------------------------- |
+| 新規 | `backend/vitest.config.ts`                   |
+| 修正 | `backend/package.json`                       |
+| 新規 | `backend/src/utils/cookie.test.ts`           |
+| 新規 | `backend/src/utils/pkce.test.ts`             |
+| 新規 | `backend/src/utils/session.test.ts`          |
+| 新規 | `backend/src/utils/ssm.test.ts`              |
+| 新規 | `backend/src/utils/secrets.test.ts`          |
+| 新規 | `backend/src/utils/oidc-config.test.ts`      |
+| 新規 | `backend/src/handlers/login.test.ts`         |
+| 新規 | `backend/src/handlers/callback.test.ts`      |
+| 新規 | `backend/src/handlers/account.test.ts`       |
+| 新規 | `frontend/vitest.config.ts`                  |
+| 修正 | `frontend/package.json`                      |
+| 新規 | `frontend/src/utils/api.test.ts`             |
 | 新規 | `frontend/src/contexts/AuthContext.test.tsx` |
-| 新規 | `frontend/src/pages/IndexPage.test.tsx` |
-| 新規 | `frontend/src/pages/CallbackPage.test.tsx` |
-| 新規 | `frontend/src/pages/ErrorPage.test.tsx` |
-| 新規 | `frontend/src/App.test.tsx` |
-| 新規 | `docs/testing-strategy.md` |
-| 修正 | `README.md` |
+| 新規 | `frontend/src/pages/IndexPage.test.tsx`      |
+| 新規 | `frontend/src/pages/CallbackPage.test.tsx`   |
+| 新規 | `frontend/src/pages/ErrorPage.test.tsx`      |
+| 新規 | `frontend/src/App.test.tsx`                  |
+| 新規 | `docs/testing-strategy.md`                   |
+| 修正 | `README.md`                                  |
 
 ### 参考資料
 

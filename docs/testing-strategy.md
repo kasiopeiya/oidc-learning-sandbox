@@ -25,17 +25,17 @@ HTTPレベルでの認証フロー検証。
 
 ### テスト対象
 
-| ファイル | 説明 | テストファイル |
-|----------|------|----------------|
-| `utils/cookie.ts` | Cookie操作ユーティリティ | `cookie.test.ts` |
-| `utils/pkce.ts` | PKCE（state, nonce, code_verifier）生成 | `pkce.test.ts` |
-| `utils/session.ts` | DynamoDBセッション管理 | `session.test.ts` |
-| `utils/ssm.ts` | SSM Parameter Store取得 | `ssm.test.ts` |
-| `utils/secrets.ts` | Secrets Manager取得 | `secrets.test.ts` |
-| `utils/oidc-config.ts` | OIDC Discovery設定取得 | `oidc-config.test.ts` |
-| `handlers/login.ts` | 認可リクエストハンドラー | `login.test.ts` |
-| `handlers/callback.ts` | コールバックハンドラー | `callback.test.ts` |
-| `handlers/account.ts` | 口座作成ハンドラー | `account.test.ts` |
+| ファイル               | 説明                                    | テストファイル        |
+| ---------------------- | --------------------------------------- | --------------------- |
+| `utils/cookie.ts`      | Cookie操作ユーティリティ                | `cookie.test.ts`      |
+| `utils/pkce.ts`        | PKCE（state, nonce, code_verifier）生成 | `pkce.test.ts`        |
+| `utils/session.ts`     | DynamoDBセッション管理                  | `session.test.ts`     |
+| `utils/ssm.ts`         | SSM Parameter Store取得                 | `ssm.test.ts`         |
+| `utils/secrets.ts`     | Secrets Manager取得                     | `secrets.test.ts`     |
+| `utils/oidc-config.ts` | OIDC Discovery設定取得                  | `oidc-config.test.ts` |
+| `handlers/login.ts`    | 認可リクエストハンドラー                | `login.test.ts`       |
+| `handlers/callback.ts` | コールバックハンドラー                  | `callback.test.ts`    |
+| `handlers/account.ts`  | 口座作成ハンドラー                      | `account.test.ts`     |
 
 ### モック戦略
 
@@ -44,16 +44,16 @@ HTTPレベルでの認証フロー検証。
 `aws-sdk-client-mock` を使用してAWS SDKをモック化。
 
 ```typescript
-import { mockClient } from 'aws-sdk-client-mock';
-import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
+import { mockClient } from 'aws-sdk-client-mock'
+import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb'
 
-const dynamoMock = mockClient(DynamoDBClient);
+const dynamoMock = mockClient(DynamoDBClient)
 
 // 正常系
-dynamoMock.on(PutItemCommand).resolves({});
+dynamoMock.on(PutItemCommand).resolves({})
 
 // 異常系
-dynamoMock.on(PutItemCommand).rejects(new Error('DynamoDB Error'));
+dynamoMock.on(PutItemCommand).rejects(new Error('DynamoDB Error'))
 ```
 
 #### openid-client
@@ -62,12 +62,12 @@ dynamoMock.on(PutItemCommand).rejects(new Error('DynamoDB Error'));
 
 ```typescript
 vi.mock('openid-client', async () => {
-  const actual = await vi.importActual('openid-client');
+  const actual = await vi.importActual('openid-client')
   return {
     ...actual,
-    discovery: vi.fn(),
-  };
-});
+    discovery: vi.fn()
+  }
+})
 ```
 
 ### テスト実行
@@ -92,14 +92,14 @@ npm run test:coverage
 
 ### テスト対象
 
-| ファイル | 説明 | テストファイル |
-|----------|------|----------------|
-| `utils/api.ts` | API呼び出しユーティリティ | `api.test.ts` |
-| `contexts/AuthContext.tsx` | 認証状態Context | `AuthContext.test.tsx` |
-| `pages/IndexPage.tsx` | トップページ | `IndexPage.test.tsx` |
-| `pages/CallbackPage.tsx` | 認証成功ページ | `CallbackPage.test.tsx` |
-| `pages/ErrorPage.tsx` | エラーページ | `ErrorPage.test.tsx` |
-| `App.tsx` | ルーティング設定 | `App.test.tsx` |
+| ファイル                   | 説明                      | テストファイル          |
+| -------------------------- | ------------------------- | ----------------------- |
+| `utils/api.ts`             | API呼び出しユーティリティ | `api.test.ts`           |
+| `contexts/AuthContext.tsx` | 認証状態Context           | `AuthContext.test.tsx`  |
+| `pages/IndexPage.tsx`      | トップページ              | `IndexPage.test.tsx`    |
+| `pages/CallbackPage.tsx`   | 認証成功ページ            | `CallbackPage.test.tsx` |
+| `pages/ErrorPage.tsx`      | エラーページ              | `ErrorPage.test.tsx`    |
+| `App.tsx`                  | ルーティング設定          | `App.test.tsx`          |
 
 ### テストライブラリ
 
@@ -111,17 +111,17 @@ npm run test:coverage
 #### fetch API
 
 ```typescript
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+const mockFetch = vi.fn()
+vi.stubGlobal('fetch', mockFetch)
 
 // 正常系
 mockFetch.mockResolvedValue({
   ok: true,
-  json: () => Promise.resolve({ accountNumber: '1234567890' }),
-});
+  json: () => Promise.resolve({ accountNumber: '1234567890' })
+})
 
 // 異常系
-mockFetch.mockRejectedValue(new Error('Network error'));
+mockFetch.mockRejectedValue(new Error('Network error'))
 ```
 
 #### ルーティング
@@ -163,13 +163,17 @@ npm run test:coverage
 ```typescript
 describe('functionName', () => {
   describe('正常系', () => {
-    it('期待される動作をする', () => { /* ... */ });
-  });
+    it('期待される動作をする', () => {
+      /* ... */
+    })
+  })
 
   describe('異常系', () => {
-    it('エラー時は適切に処理する', () => { /* ... */ });
-  });
-});
+    it('エラー時は適切に処理する', () => {
+      /* ... */
+    })
+  })
+})
 ```
 
 ### 異常系テストの観点
@@ -188,13 +192,13 @@ describe('functionName', () => {
 
 ```typescript
 beforeEach(() => {
-  dynamoMock.reset();
-  vi.clearAllMocks();
-});
+  dynamoMock.reset()
+  vi.clearAllMocks()
+})
 
 afterEach(() => {
-  vi.unstubAllEnvs();
-});
+  vi.unstubAllEnvs()
+})
 ```
 
 ## カバレッジ

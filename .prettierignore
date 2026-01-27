@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+cdk.out/
+coverage/
+
+# Generated files
+*.js.map
+*.d.ts
+
+# Lock files
+package-lock.json
+
+# CDK context
+cdk.context.json
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Test reports
+integration-tests/test-reports/
+integration-tests/test-results/
+integration-tests/playwright-report/

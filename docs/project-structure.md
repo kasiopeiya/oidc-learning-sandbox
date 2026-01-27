@@ -39,12 +39,12 @@ oidc-sandbox/
 
 ## 2. 各ディレクトリの役割
 
-| ディレクトリ | 役割 | 言語 |
-|-------------|------|------|
-| `docs/` | 設計書 | Markdown |
-| `cdk/` | AWS インフラ定義 | TypeScript |
-| `backend/` | Lambda 関数（OIDC RP ロジック） | TypeScript |
-| `frontend/` | ブラウザで動作する UI | TypeScript |
+| ディレクトリ | 役割                            | 言語       |
+| ------------ | ------------------------------- | ---------- |
+| `docs/`      | 設計書                          | Markdown   |
+| `cdk/`       | AWS インフラ定義                | TypeScript |
+| `backend/`   | Lambda 関数（OIDC RP ロジック） | TypeScript |
+| `frontend/`  | ブラウザで動作する UI           | TypeScript |
 
 ---
 

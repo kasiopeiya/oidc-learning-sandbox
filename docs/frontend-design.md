@@ -11,25 +11,25 @@
 
 ### 1.2 技術スタック
 
-| 項目 | 選定 |
-|------|------|
-| 言語 | TypeScript |
-| フレームワーク | React 18 |
-| ルーティング | React Router v7 |
-| スタイル | Tailwind CSS |
-| ビルドツール | Vite |
-| 状態管理 | React Context |
-| 配置先 | S3 + CloudFront |
+| 項目           | 選定            |
+| -------------- | --------------- |
+| 言語           | TypeScript      |
+| フレームワーク | React 18        |
+| ルーティング   | React Router v7 |
+| スタイル       | Tailwind CSS    |
+| ビルドツール   | Vite            |
+| 状態管理       | React Context   |
+| 配置先         | S3 + CloudFront |
 
 ---
 
 ## 2. 画面一覧
 
-| 画面 | コンポーネント | URL | 説明 |
-|------|---------------|-----|------|
-| トップ画面 | `IndexPage` | `/` | 「口座作成」ボタンを表示 |
-| 認証成功画面 | `CallbackPage` | `/callback` | 口座番号・ユーザー情報を表示 |
-| エラー画面 | `ErrorPage` | `/error?error=xxx` | エラーメッセージを表示 |
+| 画面         | コンポーネント | URL                | 説明                         |
+| ------------ | -------------- | ------------------ | ---------------------------- |
+| トップ画面   | `IndexPage`    | `/`                | 「口座作成」ボタンを表示     |
+| 認証成功画面 | `CallbackPage` | `/callback`        | 口座番号・ユーザー情報を表示 |
+| エラー画面   | `ErrorPage`    | `/error?error=xxx` | エラーメッセージを表示       |
 
 ---
 
@@ -114,18 +114,18 @@
 
 #### エラーコードとメッセージの対応
 
-| エラーコード | 表示メッセージ |
-|-------------|---------------|
-| `missing_session` | セッションが見つかりません。もう一度お試しください。 |
-| `state_mismatch` | セッションが無効です。もう一度お試しください。 |
-| `nonce_mismatch` | セッションが無効です。もう一度お試しください。 |
-| `missing_code` | 認証情報が見つかりません。 |
-| `access_denied` | 認証がキャンセルされました。 |
-| `op_error` | 認証サーバーでエラーが発生しました。 |
-| `invalid_signature` | 認証情報が不正です。 |
-| `token_expired` | 認証の有効期限が切れました。もう一度お試しください。 |
-| `network_error` | 認証サーバーとの通信に失敗しました。 |
-| その他 | 認証に失敗しました。もう一度お試しください。 |
+| エラーコード        | 表示メッセージ                                       |
+| ------------------- | ---------------------------------------------------- |
+| `missing_session`   | セッションが見つかりません。もう一度お試しください。 |
+| `state_mismatch`    | セッションが無効です。もう一度お試しください。       |
+| `nonce_mismatch`    | セッションが無効です。もう一度お試しください。       |
+| `missing_code`      | 認証情報が見つかりません。                           |
+| `access_denied`     | 認証がキャンセルされました。                         |
+| `op_error`          | 認証サーバーでエラーが発生しました。                 |
+| `invalid_signature` | 認証情報が不正です。                                 |
+| `token_expired`     | 認証の有効期限が切れました。もう一度お試しください。 |
+| `network_error`     | 認証サーバーとの通信に失敗しました。                 |
+| その他              | 認証に失敗しました。もう一度お試しください。         |
 
 #### ワイヤーフレーム
 
@@ -190,12 +190,12 @@ dist/
 #### App.tsx（ルーティング設定）
 
 ```tsx
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom'
 
-import { AuthProvider } from './contexts/AuthContext';
-import { IndexPage } from './pages/IndexPage';
-import { CallbackPage } from './pages/CallbackPage';
-import { ErrorPage } from './pages/ErrorPage';
+import { AuthProvider } from './contexts/AuthContext'
+import { IndexPage } from './pages/IndexPage'
+import { CallbackPage } from './pages/CallbackPage'
+import { ErrorPage } from './pages/ErrorPage'
 
 export function App() {
   return (
@@ -206,7 +206,7 @@ export function App() {
         <Route path="/error" element={<ErrorPage />} />
       </Routes>
     </AuthProvider>
-  );
+  )
 }
 ```
 
@@ -214,10 +214,10 @@ export function App() {
 
 ```tsx
 interface AuthContextType {
-  user: UserInfo | null;       // ユーザー情報
-  account: AccountInfo | null; // 口座情報
-  isLoading: boolean;          // ローディング状態
-  error: string | null;        // エラーメッセージ
+  user: UserInfo | null // ユーザー情報
+  account: AccountInfo | null // 口座情報
+  isLoading: boolean // ローディング状態
+  error: string | null // エラーメッセージ
   // ... setter関数
 }
 ```
@@ -232,9 +232,9 @@ interface AuthContextType {
 export async function createAccount(): Promise<AccountResponse | ErrorResponse> {
   const response = await fetch('/api/account', {
     method: 'POST',
-    credentials: 'include', // Cookieを送信
-  });
-  return response.json();
+    credentials: 'include' // Cookieを送信
+  })
+  return response.json()
 }
 ```
 
@@ -275,8 +275,8 @@ export async function createAccount(): Promise<AccountResponse | ErrorResponse> 
 ### 5.2 vite.config.ts
 
 ```typescript
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
@@ -284,14 +284,14 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
-    },
+        changeOrigin: true
+      }
+    }
   },
   build: {
-    outDir: 'dist',
-  },
-});
+    outDir: 'dist'
+  }
+})
 ```
 
 ### 5.3 tailwind.config.js
@@ -300,10 +300,10 @@ export default defineConfig({
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
-    extend: {},
+    extend: {}
   },
-  plugins: [],
-};
+  plugins: []
+}
 ```
 
 ### 5.4 tsconfig.json
@@ -366,11 +366,11 @@ dist/                   →    S3 Bucket
 
 ### 6.2 CloudFrontの設定
 
-| 設定項目 | 値 |
-|----------|-----|
-| デフォルトルートオブジェクト | `index.html` |
-| 403エラーページ | `/index.html`（200応答） |
-| 404エラーページ | `/index.html`（200応答） |
+| 設定項目                     | 値                       |
+| ---------------------------- | ------------------------ |
+| デフォルトルートオブジェクト | `index.html`             |
+| 403エラーページ              | `/index.html`（200応答） |
+| 404エラーページ              | `/index.html`（200応答） |
 
 **SPA対応**: CloudFrontのエラーページ設定により、`/callback`や`/error`などのパスに直接アクセスした際も`index.html`が返されます。React Routerがクライアントサイドでルーティングを処理し、適切なコンポーネントを表示します。
 

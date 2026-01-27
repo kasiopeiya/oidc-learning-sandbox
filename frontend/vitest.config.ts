@@ -1,6 +1,6 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
@@ -20,13 +20,13 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       reportsDirectory: './coverage',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/main.tsx', 'src/test/**'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/main.tsx', 'src/test/**']
     },
 
     // グローバルなテスト関数
     globals: true,
 
     // タイムアウト設定（ミリ秒）
-    testTimeout: 10000,
-  },
-});
+    testTimeout: 10000
+  }
+})

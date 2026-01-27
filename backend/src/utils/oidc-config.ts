@@ -22,14 +22,14 @@ import { getClientId, getClientSecret } from './secrets'
  * Lambda のウォームスタート時に再利用することで、
  * OIDC Discovery のリクエストを削減する。
  */
-let cachedConfig: client.Configuration | null = null;
+let cachedConfig: client.Configuration | null = null
 
 /**
  * キャッシュされた Issuer URL
  *
  * 環境変数が変更された場合にキャッシュを無効化するために使用。
  */
-let cachedIssuer: string | null = null;
+let cachedIssuer: string | null = null
 
 /**
  * OIDC 設定を取得

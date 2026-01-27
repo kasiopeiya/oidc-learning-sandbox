@@ -64,14 +64,14 @@ AWS CDKを用いて、IDプロバイダー（Cognito）とリライイングパ�
 
 ## 技術スタック
 
-| 項目 | 技術 |
-|------|------|
-| 言語 | TypeScript |
-| インフラ | AWS CDK |
-| 認証 (OP) | Amazon Cognito |
-| バックエンド (RP) | API Gateway (HTTP API) + Lambda |
-| フロントエンド | React 18 + Vite + Tailwind CSS + React Router |
-| ホスティング | S3 + CloudFront |
+| 項目              | 技術                                          |
+| ----------------- | --------------------------------------------- |
+| 言語              | TypeScript                                    |
+| インフラ          | AWS CDK                                       |
+| 認証 (OP)         | Amazon Cognito                                |
+| バックエンド (RP) | API Gateway (HTTP API) + Lambda               |
+| フロントエンド    | React 18 + Vite + Tailwind CSS + React Router |
+| ホスティング      | S3 + CloudFront                               |
 
 ## 前提条件
 
@@ -166,13 +166,13 @@ OidcSandboxStack.CloudFrontURL = https://xxxxx.cloudfront.net
 
 ### 確認ポイント
 
-| 確認項目 | 期待結果 |
-|----------|----------|
-| トップ画面 → Cognito | 「口座作成」ボタンで認可エンドポイントにリダイレクト |
-| 新規ユーザー登録 | メール確認後にログイン可能 |
-| 認証成功画面 | メールアドレス、ユーザーID、口座番号が表示される |
-| ログインキャンセル | エラー画面に適切なメッセージが表示される |
-| SPA直接アクセス | `/callback`や`/error`に直接アクセスしてもSPAが正しく表示される |
+| 確認項目             | 期待結果                                                       |
+| -------------------- | -------------------------------------------------------------- |
+| トップ画面 → Cognito | 「口座作成」ボタンで認可エンドポイントにリダイレクト           |
+| 新規ユーザー登録     | メール確認後にログイン可能                                     |
+| 認証成功画面         | メールアドレス、ユーザーID、口座番号が表示される               |
+| ログインキャンセル   | エラー画面に適切なメッセージが表示される                       |
+| SPA直接アクセス      | `/callback`や`/error`に直接アクセスしてもSPAが正しく表示される |
 
 ### 自動E2Eテスト（Playwright）
 
@@ -213,12 +213,12 @@ npm run test:ui
 
 `source scripts/load-env.sh` を実行すると、以下の環境変数が設定されます：
 
-| 環境変数 | 説明 |
-|----------|------|
-| `CLOUDFRONT_URL` | CloudFront ディストリビューションの URL |
-| `USER_POOL_ID` | Cognito User Pool ID |
-| `USER_POOL_CLIENT_ID` | Cognito User Pool Client ID |
-| `COGNITO_DOMAIN` | Cognito ドメイン |
+| 環境変数              | 説明                                    |
+| --------------------- | --------------------------------------- |
+| `CLOUDFRONT_URL`      | CloudFront ディストリビューションの URL |
+| `USER_POOL_ID`        | Cognito User Pool ID                    |
+| `USER_POOL_CLIENT_ID` | Cognito User Pool Client ID             |
+| `COGNITO_DOMAIN`      | Cognito ドメイン                        |
 
 #### テスト結果
 
@@ -329,14 +329,14 @@ cd cdk && npx cdk destroy
 
 このプロジェクトでは以下のセキュリティ対策を実装しています:
 
-| 対策 | 説明 |
-|------|------|
-| HTTPS 強制 | CloudFront で HTTP → HTTPS リダイレクト |
-| S3 非公開 | OAC 経由でのみアクセス可能 |
-| PKCE | 認可コード横取り攻撃を防止 |
-| State パラメータ | CSRF 攻撃を防止 |
-| Nonce パラメータ | リプレイ攻撃を防止 |
-| HttpOnly Cookie | XSS によるセッション情報の漏洩を防止 |
+| 対策             | 説明                                    |
+| ---------------- | --------------------------------------- |
+| HTTPS 強制       | CloudFront で HTTP → HTTPS リダイレクト |
+| S3 非公開        | OAC 経由でのみアクセス可能              |
+| PKCE             | 認可コード横取り攻撃を防止              |
+| State パラメータ | CSRF 攻撃を防止                         |
+| Nonce パラメータ | リプレイ攻撃を防止                      |
+| HttpOnly Cookie  | XSS によるセッション情報の漏洩を防止    |
 
 ## 注意事項
 

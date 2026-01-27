@@ -12,13 +12,13 @@ import {
   AdminSetUserPasswordCommand,
   AdminDeleteUserCommand,
   AdminInitiateAuthCommand,
-  AuthFlowType,
-} from '@aws-sdk/client-cognito-identity-provider';
+  AuthFlowType
+} from '@aws-sdk/client-cognito-identity-provider'
 
 // Cognito Identity Provider クライアントの初期化
 const client = new CognitoIdentityProviderClient({
-  region: 'ap-northeast-1',
-});
+  region: 'ap-northeast-1'
+})
 
 /**
  * テストユーザーを作成する
@@ -30,14 +30,11 @@ const client = new CognitoIdentityProviderClient({
  * @param email - テストユーザーのメールアドレス
  * @param password - テストユーザーのパスワード
  */
-export async function createTestUser(
-  email: string,
-  password: string
-): Promise<void> {
-  const userPoolId = process.env.USER_POOL_ID;
+export async function createTestUser(email: string, password: string): Promise<void> {
+  const userPoolId = process.env.USER_POOL_ID
 
   if (!userPoolId) {
-    throw new Error('USER_POOL_ID 環境変数が設定されていません');
+    throw new Error('USER_POOL_ID 環境変数が設定されていません')
   }
 
   // ステップ1: ユーザーを作成（確認メール送信をスキップ）
@@ -49,10 +46,10 @@ export async function createTestUser(
       MessageAction: 'SUPPRESS',
       UserAttributes: [
         { Name: 'email', Value: email },
-        { Name: 'email_verified', Value: 'true' },
-      ],
+        { Name: 'email_verified', Value: 'true' }
+      ]
     })
-  );
+  )
 
   // ステップ2: パスワードを永続的に設定
   // Permanent: true により、初回ログイン時のパスワード変更をスキップ
@@ -61,9 +58,9 @@ export async function createTestUser(
       UserPoolId: userPoolId,
       Username: email,
       Password: password,
-      Permanent: true,
+      Permanent: true
     })
-  );
+  )
 }
 
 /**
@@ -75,22 +72,22 @@ export async function createTestUser(
  * @param email - 削除するテストユーザーのメールアドレス
  */
 export async function deleteTestUser(email: string): Promise<void> {
-  const userPoolId = process.env.USER_POOL_ID;
+  const userPoolId = process.env.USER_POOL_ID
 
   if (!userPoolId) {
-    throw new Error('USER_POOL_ID 環境変数が設定されていません');
+    throw new Error('USER_POOL_ID 環境変数が設定されていません')
   }
 
   try {
     await client.send(
       new AdminDeleteUserCommand({
         UserPoolId: userPoolId,
-        Username: email,
+        Username: email
       })
-    );
+    )
   } catch (error) {
     // ユーザーが存在しない場合などはエラーを無視
-    console.warn(`テストユーザーの削除に失敗しました: ${email}`, error);
+    console.warn(`テストユーザーの削除に失敗しました: ${email}`, error)
   }
 }
 
@@ -103,9 +100,9 @@ export async function deleteTestUser(email: string): Promise<void> {
  * @returns 生成されたテストメールアドレス
  */
 export function generateTestEmail(): string {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  return `e2e-test-${timestamp}-${random}@example.com`;
+  const timestamp = Date.now()
+  const random = Math.random().toString(36).substring(2, 8)
+  return `e2e-test-${timestamp}-${random}@example.com`
 }
 
 /**
@@ -113,13 +110,13 @@ export function generateTestEmail(): string {
  */
 export interface AuthResult {
   /** ユーザーID（sub） */
-  sub: string;
+  sub: string
   /** メールアドレス */
-  email: string;
+  email: string
   /** IDトークン */
-  idToken: string;
+  idToken: string
   /** アクセストークン */
-  accessToken: string;
+  accessToken: string
 }
 
 /**
@@ -132,18 +129,15 @@ export interface AuthResult {
  * @param password - テストユーザーのパスワード
  * @returns 認証結果（sub, email, トークン）
  */
-export async function authenticateTestUser(
-  email: string,
-  password: string
-): Promise<AuthResult> {
-  const userPoolId = process.env.USER_POOL_ID;
-  const clientId = process.env.USER_POOL_CLIENT_ID;
+export async function authenticateTestUser(email: string, password: string): Promise<AuthResult> {
+  const userPoolId = process.env.USER_POOL_ID
+  const clientId = process.env.USER_POOL_CLIENT_ID
 
   if (!userPoolId) {
-    throw new Error('USER_POOL_ID 環境変数が設定されていません');
+    throw new Error('USER_POOL_ID 環境変数が設定されていません')
   }
   if (!clientId) {
-    throw new Error('USER_POOL_CLIENT_ID 環境変数が設定されていません');
+    throw new Error('USER_POOL_CLIENT_ID 環境変数が設定されていません')
   }
 
   // AdminInitiateAuth を使用して認証
@@ -155,28 +149,28 @@ export async function authenticateTestUser(
       AuthFlow: AuthFlowType.ADMIN_USER_PASSWORD_AUTH,
       AuthParameters: {
         USERNAME: email,
-        PASSWORD: password,
-      },
+        PASSWORD: password
+      }
     })
-  );
+  )
 
   if (!response.AuthenticationResult?.IdToken) {
-    throw new Error('認証に失敗しました: IDトークンが取得できません');
+    throw new Error('認証に失敗しました: IDトークンが取得できません')
   }
 
-  const idToken = response.AuthenticationResult.IdToken;
-  const accessToken = response.AuthenticationResult.AccessToken!;
+  const idToken = response.AuthenticationResult.IdToken
+  const accessToken = response.AuthenticationResult.AccessToken!
 
   // IDトークンをデコードしてユーザー情報を取得
   // 注意: テスト用のため署名検証はスキップ（JWTの構造のみ利用）
-  const payload = decodeJwtPayload(idToken);
+  const payload = decodeJwtPayload(idToken)
 
   return {
     sub: payload.sub,
     email: payload.email,
     idToken,
-    accessToken,
-  };
+    accessToken
+  }
 }
 
 /**
@@ -187,14 +181,14 @@ export async function authenticateTestUser(
  */
 function decodeJwtPayload(token: string): { sub: string; email: string } {
   // JWTは「ヘッダー.ペイロード.署名」の形式
-  const parts = token.split('.');
+  const parts = token.split('.')
   if (parts.length !== 3) {
-    throw new Error('無効なJWTトークン形式です');
+    throw new Error('無効なJWTトークン形式です')
   }
 
   // ペイロード部分をBase64URLデコード
-  const payload = parts[1];
-  const decoded = Buffer.from(payload, 'base64url').toString('utf-8');
+  const payload = parts[1]
+  const decoded = Buffer.from(payload, 'base64url').toString('utf-8')
 
-  return JSON.parse(decoded);
+  return JSON.parse(decoded)
 }

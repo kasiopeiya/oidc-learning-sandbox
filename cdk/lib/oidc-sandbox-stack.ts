@@ -1,18 +1,18 @@
-import * as path from 'path';
+import * as path from 'path'
 
-import { CfnOutput, Duration, Fn, RemovalPolicy, SecretValue, Stack, StackProps } from 'aws-cdk-lib';
-import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
-import { aws_cloudfront_origins as origins } from 'aws-cdk-lib';
-import { aws_cognito as cognito } from 'aws-cdk-lib';
-import { aws_dynamodb as dynamodb } from 'aws-cdk-lib';
-import { aws_iam as iam } from 'aws-cdk-lib';
-import { aws_lambda as lambda } from 'aws-cdk-lib';
-import { aws_lambda_nodejs as nodejs } from 'aws-cdk-lib';
-import { aws_s3 as s3 } from 'aws-cdk-lib';
-import { aws_s3_deployment as s3deploy } from 'aws-cdk-lib';
-import { aws_ssm as ssm } from 'aws-cdk-lib';
-import { aws_secretsmanager as secretsmanager } from 'aws-cdk-lib';
-import { Construct } from 'constructs';
+import { CfnOutput, Duration, Fn, RemovalPolicy, SecretValue, Stack, StackProps } from 'aws-cdk-lib'
+import { aws_cloudfront as cloudfront } from 'aws-cdk-lib'
+import { aws_cloudfront_origins as origins } from 'aws-cdk-lib'
+import { aws_cognito as cognito } from 'aws-cdk-lib'
+import { aws_dynamodb as dynamodb } from 'aws-cdk-lib'
+import { aws_iam as iam } from 'aws-cdk-lib'
+import { aws_lambda as lambda } from 'aws-cdk-lib'
+import { aws_lambda_nodejs as nodejs } from 'aws-cdk-lib'
+import { aws_s3 as s3 } from 'aws-cdk-lib'
+import { aws_s3_deployment as s3deploy } from 'aws-cdk-lib'
+import { aws_ssm as ssm } from 'aws-cdk-lib'
+import { aws_secretsmanager as secretsmanager } from 'aws-cdk-lib'
+import { Construct } from 'constructs'
 
 /**
  * OIDC学習サンドボックスのメインスタック
@@ -24,34 +24,34 @@ import { Construct } from 'constructs';
  */
 export class OidcSandboxStack extends Stack {
   /** Cognito User Pool - OIDCのOPとして機能 */
-  public readonly userPool: cognito.UserPool;
+  public readonly userPool: cognito.UserPool
 
   /** Cognito User Pool Client - RPがOPと通信するためのクライアント */
-  public readonly userPoolClient: cognito.UserPoolClient;
+  public readonly userPoolClient: cognito.UserPoolClient
 
   /** Cognito Domain - ホストUIのドメイン */
-  public readonly userPoolDomain: cognito.UserPoolDomain;
+  public readonly userPoolDomain: cognito.UserPoolDomain
 
   /** S3バケット - フロントエンドの静的ファイルをホスティング */
-  public readonly websiteBucket: s3.Bucket;
+  public readonly websiteBucket: s3.Bucket
 
   /** CloudFrontディストリビューション - HTTPSでコンテンツを配信 */
-  public readonly distribution: cloudfront.Distribution;
+  public readonly distribution: cloudfront.Distribution
 
   /** Login Lambda関数 - 認可リクエストURL生成 */
-  public readonly loginFunction: nodejs.NodejsFunction;
+  public readonly loginFunction: nodejs.NodejsFunction
 
   /** Callback Lambda関数 - トークン交換・検証 */
-  public readonly callbackFunction: nodejs.NodejsFunction;
+  public readonly callbackFunction: nodejs.NodejsFunction
 
   /** Account Lambda関数 - 口座作成API */
-  public readonly accountFunction: nodejs.NodejsFunction;
+  public readonly accountFunction: nodejs.NodejsFunction
 
   /** セッション管理用DynamoDBテーブル - State/Nonce/PKCE/アクセストークンを保存 */
-  public readonly sessionTable: dynamodb.Table;
+  public readonly sessionTable: dynamodb.Table
 
   constructor(scope: Construct, id: string, props?: StackProps) {
-    super(scope, id, props);
+    super(scope, id, props)
 
     // ============================================================
     // Cognito User Pool（OIDC の OP: OpenID Provider）
@@ -63,7 +63,7 @@ export class OidcSandboxStack extends Stack {
     this.userPool = new cognito.UserPool(this, 'UserPool', {
       // サインイン設定: メールアドレスでログイン
       signInAliases: {
-        email: true,
+        email: true
       },
       // セルフサインアップを許可（ユーザー自身でアカウント作成可能）
       selfSignUpEnabled: true,
@@ -71,9 +71,8 @@ export class OidcSandboxStack extends Stack {
       // Cognito がデフォルトのメール送信機能を使用して検証コードを送信
       userVerification: {
         emailSubject: 'OIDC学習サンドボックス - メールアドレスの確認',
-        emailBody:
-          'OIDC学習サンドボックスへのご登録ありがとうございます。確認コード: {####}',
-        emailStyle: cognito.VerificationEmailStyle.CODE,
+        emailBody: 'OIDC学習サンドボックスへのご登録ありがとうございます。確認コード: {####}',
+        emailStyle: cognito.VerificationEmailStyle.CODE
       },
       // パスワードポリシー: Cognito のデフォルト設定を使用
       // （8文字以上、大文字・小文字・数字・記号を含む）
@@ -82,15 +81,15 @@ export class OidcSandboxStack extends Stack {
         requireLowercase: true,
         requireUppercase: true,
         requireDigits: true,
-        requireSymbols: true,
+        requireSymbols: true
       },
       // MFA: 学習用途のため無効
       mfa: cognito.Mfa.OFF,
       // アカウントリカバリー: メールで回復可能
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       // スタック削除時に User Pool も削除（学習用途のため）
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
+      removalPolicy: RemovalPolicy.DESTROY
+    })
 
     // ============================================================
     // Cognito User Pool Client（OIDC の RP が使用するクライアント）
@@ -108,8 +107,8 @@ export class OidcSandboxStack extends Stack {
       // トークンの有効期限設定
       accessTokenValidity: Duration.hours(1),
       idTokenValidity: Duration.hours(1),
-      refreshTokenValidity: Duration.days(30),
-    });
+      refreshTokenValidity: Duration.days(30)
+    })
 
     // ============================================================
     // Cognito Domain（ホストUI用ドメイン）
@@ -122,9 +121,9 @@ export class OidcSandboxStack extends Stack {
       // Cognito ドメインプレフィックス
       // Stack 名とアカウントIDを組み合わせてユニークな値を生成
       cognitoDomain: {
-        domainPrefix: `${this.stackName.toLowerCase()}-${this.account}`,
-      },
-    });
+        domainPrefix: `${this.stackName.toLowerCase()}-${this.account}`
+      }
+    })
 
     // ============================================================
     // DynamoDBテーブル（セッション管理）
@@ -137,15 +136,15 @@ export class OidcSandboxStack extends Stack {
       // パーティションキー: セッションID
       partitionKey: {
         name: 'sessionId',
-        type: dynamodb.AttributeType.STRING,
+        type: dynamodb.AttributeType.STRING
       },
       // オンデマンドキャパシティ（学習用途のため従量課金）
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       // TTL属性を有効化（ttl フィールドで自動削除）
       timeToLiveAttribute: 'ttl',
       // スタック削除時にテーブルも削除（学習用途のため）
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
+      removalPolicy: RemovalPolicy.DESTROY
+    })
 
     // ============================================================
     // S3バケット（フロントエンドの静的ファイル）
@@ -162,8 +161,8 @@ export class OidcSandboxStack extends Stack {
       // スタック削除時にバケットも削除（学習用途のため）
       removalPolicy: RemovalPolicy.DESTROY,
       // バケット削除時にオブジェクトも自動削除
-      autoDeleteObjects: true,
-    });
+      autoDeleteObjects: true
+    })
 
     // ============================================================
     // CloudFrontディストリビューション（HTTPS配信）
@@ -179,7 +178,7 @@ export class OidcSandboxStack extends Stack {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(this.websiteBucket),
         // HTTPS へのリダイレクトを有効化
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS
       },
       // ルートアクセス時に返すファイル
       defaultRootObject: 'index.html',
@@ -193,15 +192,15 @@ export class OidcSandboxStack extends Stack {
         {
           httpStatus: 403,
           responseHttpStatus: 200,
-          responsePagePath: '/index.html',
+          responsePagePath: '/index.html'
         },
         {
           httpStatus: 404,
           responseHttpStatus: 200,
-          responsePagePath: '/index.html',
-        },
-      ],
-    });
+          responsePagePath: '/index.html'
+        }
+      ]
+    })
 
     // ============================================================
     // Cognito User Pool Client の OAuth 設定
@@ -209,22 +208,19 @@ export class OidcSandboxStack extends Stack {
 
     // CloudFront の URL が確定した後、CfnUserPoolClient を使って OAuth 設定を追加
     // L2 Construct では後から設定を変更できないため、L1 Construct（Cfn）を使用
-    const cfnUserPoolClient = this.userPoolClient.node
-      .defaultChild as cognito.CfnUserPoolClient;
+    const cfnUserPoolClient = this.userPoolClient.node.defaultChild as cognito.CfnUserPoolClient
 
     // OAuth 2.0 / OIDC の設定を追加
     // - 認可コードフロー: 認可コードを受け取り、バックエンドでトークンに交換
     // - スコープ: openid（OIDC必須）、email、profile
     // - コールバックURL: CloudFront 経由の /api/auth/callback
-    cfnUserPoolClient.allowedOAuthFlows = ['code'];
-    cfnUserPoolClient.allowedOAuthFlowsUserPoolClient = true;
-    cfnUserPoolClient.allowedOAuthScopes = ['openid', 'email', 'profile'];
+    cfnUserPoolClient.allowedOAuthFlows = ['code']
+    cfnUserPoolClient.allowedOAuthFlowsUserPoolClient = true
+    cfnUserPoolClient.allowedOAuthScopes = ['openid', 'email', 'profile']
     cfnUserPoolClient.callbackUrLs = [
-      `https://${this.distribution.distributionDomainName}/api/auth/callback`,
-    ];
-    cfnUserPoolClient.logoutUrLs = [
-      `https://${this.distribution.distributionDomainName}`,
-    ];
+      `https://${this.distribution.distributionDomainName}/api/auth/callback`
+    ]
+    cfnUserPoolClient.logoutUrLs = [`https://${this.distribution.distributionDomainName}`]
 
     // ============================================================
     // S3へのフロントエンドファイルのデプロイ
@@ -238,8 +234,8 @@ export class OidcSandboxStack extends Stack {
       destinationBucket: this.websiteBucket,
       // CloudFront キャッシュの無効化
       distribution: this.distribution,
-      distributionPaths: ['/*'],
-    });
+      distributionPaths: ['/*']
+    })
 
     // ============================================================
     // Outputs（デプロイ後に確認するための出力）
@@ -247,37 +243,36 @@ export class OidcSandboxStack extends Stack {
 
     new CfnOutput(this, 'UserPoolId', {
       value: this.userPool.userPoolId,
-      description: 'Cognito User Pool ID',
-    });
+      description: 'Cognito User Pool ID'
+    })
 
     new CfnOutput(this, 'UserPoolClientId', {
       value: this.userPoolClient.userPoolClientId,
-      description: 'Cognito User Pool Client ID',
-    });
+      description: 'Cognito User Pool Client ID'
+    })
 
     new CfnOutput(this, 'CognitoDomain', {
       value: this.userPoolDomain.domainName,
-      description: 'Cognito Domain',
-    });
+      description: 'Cognito Domain'
+    })
 
     new CfnOutput(this, 'CloudFrontUrl', {
       value: `https://${this.distribution.distributionDomainName}`,
-      description: 'CloudFront Distribution URL',
-    });
+      description: 'CloudFront Distribution URL'
+    })
 
     new CfnOutput(this, 'WebsiteBucketName', {
       value: this.websiteBucket.bucketName,
-      description: 'S3 Bucket Name for Frontend',
-    });
-
+      description: 'S3 Bucket Name for Frontend'
+    })
 
     // ============================================================
     // 定数定義: SecretManager のシークレット名
     // ============================================================
     // 樹幹参照エラーを避けるため、ここで定数を定義
     // Cognito User Pool Client のクライアントシークレットを Secrets Manager に保存する場合の名前
-    const clientIdName = 'oidc-sandbox/client-id';
-    const clientSecretName = 'oidc-sandbox/client-secret';
+    const clientIdName = 'oidc-sandbox/client-id'
+    const clientSecretName = 'oidc-sandbox/client-secret'
 
     // ============================================================
     // Lambda関数（OIDC の RP: Relying Party）
@@ -309,14 +304,14 @@ export class OidcSandboxStack extends Stack {
         SESSION_TABLE_NAME: this.sessionTable.tableName,
         // SSM Parameter Store のパラメータ名（CloudFront URL を取得するため）
         // 循環参照を避けるため、固定値を設定し実行時に SSM API で値を取得
-        SSM_CLOUDFRONT_URL_PARAM: '/oidc-sandbox/cloudfront-url',
+        SSM_CLOUDFRONT_URL_PARAM: '/oidc-sandbox/cloudfront-url'
       },
       // esbuild によるバンドル設定
       bundling: {
         // 外部パッケージとして扱わない（全てバンドルに含める）
-        externalModules: [],
-      },
-    };
+        externalModules: []
+      }
+    }
 
     // Login Lambda関数
     // - /api/auth/login エンドポイントを処理
@@ -325,8 +320,8 @@ export class OidcSandboxStack extends Stack {
       ...lambdaCommonProps,
       entry: path.join(__dirname, '../../backend/src/handlers/login.ts'),
       handler: 'handler',
-      description: 'OIDC認可リクエストURL生成・リダイレクト',
-    });
+      description: 'OIDC認可リクエストURL生成・リダイレクト'
+    })
 
     // Callback Lambda関数
     // - /api/auth/callback エンドポイントを処理
@@ -335,8 +330,8 @@ export class OidcSandboxStack extends Stack {
       ...lambdaCommonProps,
       entry: path.join(__dirname, '../../backend/src/handlers/callback.ts'),
       handler: 'handler',
-      description: 'OIDCコールバック処理（トークン交換・検証）',
-    });
+      description: 'OIDCコールバック処理（トークン交換・検証）'
+    })
 
     // Account Lambda関数
     // - /api/account エンドポイントを処理
@@ -346,8 +341,8 @@ export class OidcSandboxStack extends Stack {
       ...lambdaCommonProps,
       entry: path.join(__dirname, '../../backend/src/handlers/account.ts'),
       handler: 'handler',
-      description: '口座作成API（アクセストークン検証）',
-    });
+      description: '口座作成API（アクセストークン検証）'
+    })
 
     // ============================================================
     // Lambda Function URLs（API Gateway の代替）
@@ -356,18 +351,18 @@ export class OidcSandboxStack extends Stack {
     // Login Lambda Function URL
     // - CloudFront から直接 Lambda を呼び出すためのエンドポイント
     const loginFunctionUrl = this.loginFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-    });
+      authType: lambda.FunctionUrlAuthType.NONE
+    })
 
     // Callback Lambda Function URL
     const callbackFunctionUrl = this.callbackFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-    });
+      authType: lambda.FunctionUrlAuthType.NONE
+    })
 
     // Account Lambda Function URL
     const accountFunctionUrl = this.accountFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-    });
+      authType: lambda.FunctionUrlAuthType.NONE
+    })
 
     // ============================================================
     // CloudFront ビヘイビアの追加（Lambda Function URLs 用）
@@ -376,33 +371,37 @@ export class OidcSandboxStack extends Stack {
     // Lambda Function URL のホスト名を抽出
     // 例: https://xxxxxxxxxx.lambda-url.ap-northeast-1.on.aws/
     // → xxxxxxxxxx.lambda-url.ap-northeast-1.on.aws
-    const loginFunctionUrlHost = Fn.select(2, Fn.split('/', loginFunctionUrl.url));
-    const callbackFunctionUrlHost = Fn.select(2, Fn.split('/', callbackFunctionUrl.url));
-    const accountFunctionUrlHost = Fn.select(2, Fn.split('/', accountFunctionUrl.url));
+    const loginFunctionUrlHost = Fn.select(2, Fn.split('/', loginFunctionUrl.url))
+    const callbackFunctionUrlHost = Fn.select(2, Fn.split('/', callbackFunctionUrl.url))
+    const accountFunctionUrlHost = Fn.select(2, Fn.split('/', accountFunctionUrl.url))
 
     // /api/auth/login パスを Login Lambda Function URL に転送
     this.distribution.addBehavior('/api/auth/login', new origins.HttpOrigin(loginFunctionUrlHost), {
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
       originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-      allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-    });
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD
+    })
 
     // /api/auth/callback パスを Callback Lambda Function URL に転送
-    this.distribution.addBehavior('/api/auth/callback', new origins.HttpOrigin(callbackFunctionUrlHost), {
-      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-      allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-    });
+    this.distribution.addBehavior(
+      '/api/auth/callback',
+      new origins.HttpOrigin(callbackFunctionUrlHost),
+      {
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD
+      }
+    )
 
     // /api/account パスを Account Lambda Function URL に転送
     this.distribution.addBehavior('/api/account', new origins.HttpOrigin(accountFunctionUrlHost), {
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
       originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-    });
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL
+    })
 
     // ============================================================
     // SSM Parameter Store（CloudFront URL の保存）
@@ -411,12 +410,12 @@ export class OidcSandboxStack extends Stack {
     // CloudFront URL を SSM Parameter Store に保存
     // Lambda 関数は固定のパラメータ名を持ち、実行時に SSM API で値を取得する
     // これにより CloudFormation テンプレートレベルでの循環参照を回避
-    const ssmParamName = '/oidc-sandbox/cloudfront-url';
+    const ssmParamName = '/oidc-sandbox/cloudfront-url'
     new ssm.StringParameter(this, 'CloudFrontUrlParam', {
       parameterName: ssmParamName,
       stringValue: `https://${this.distribution.distributionDomainName}`,
-      description: 'CloudFront Distribution URL for OIDC redirect',
-    });
+      description: 'CloudFront Distribution URL for OIDC redirect'
+    })
 
     // ============================================================
     // Secrets Manager Secret の作成
@@ -426,13 +425,11 @@ export class OidcSandboxStack extends Stack {
     // userPoolClientId は文字列なので SecretValue.unsafePlainText() でラップ
     new secretsmanager.Secret(this, 'ClientId', {
       secretName: clientIdName,
-      secretStringValue: SecretValue.unsafePlainText(
-        this.userPoolClient.userPoolClientId
-      ),
+      secretStringValue: SecretValue.unsafePlainText(this.userPoolClient.userPoolClientId),
       description: 'OIDC Client ID for Cognito User Pool Client',
       // スタック削除時にSecretも削除（学習用のため）
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
+      removalPolicy: RemovalPolicy.DESTROY
+    })
 
     // Cognito の Client Secret を Secrets Manager に保存
     // userPoolClientSecret は SecretValue 型なので直接渡せる
@@ -441,8 +438,8 @@ export class OidcSandboxStack extends Stack {
       secretStringValue: this.userPoolClient.userPoolClientSecret,
       description: 'OIDC Client Secret for Cognito User Pool Client',
       // スタック削除時にSecretも削除（学習用のため）
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
+      removalPolicy: RemovalPolicy.DESTROY
+    })
 
     // ============================================================
     // Lambda 関数への権限付与
@@ -453,11 +450,11 @@ export class OidcSandboxStack extends Stack {
     const ssmReadPolicy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ['ssm:GetParameter'],
-      resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter${ssmParamName}`],
-    });
+      resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter${ssmParamName}`]
+    })
 
-    this.loginFunction.addToRolePolicy(ssmReadPolicy);
-    this.callbackFunction.addToRolePolicy(ssmReadPolicy);
+    this.loginFunction.addToRolePolicy(ssmReadPolicy)
+    this.callbackFunction.addToRolePolicy(ssmReadPolicy)
 
     // Secrets Manager からクライアントシークレットを取得する権限を付与
     // L2メソッド（grantRead）を使用するとSecrets Managerリソースへの参照が発生し循環参照になるため、
@@ -465,40 +462,40 @@ export class OidcSandboxStack extends Stack {
     const secretsReadPolicy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ['secretsmanager:GetSecretValue'],
-      resources: ['*'],
-    });
+      resources: ['*']
+    })
 
-    this.loginFunction.addToRolePolicy(secretsReadPolicy);
-    this.callbackFunction.addToRolePolicy(secretsReadPolicy);
-    this.accountFunction.addToRolePolicy(secretsReadPolicy);
+    this.loginFunction.addToRolePolicy(secretsReadPolicy)
+    this.callbackFunction.addToRolePolicy(secretsReadPolicy)
+    this.accountFunction.addToRolePolicy(secretsReadPolicy)
 
     // Lambda Function URLs の出力
     new CfnOutput(this, 'LoginFunctionUrl', {
       value: loginFunctionUrl.url,
-      description: 'Login Lambda Function URL',
-    });
+      description: 'Login Lambda Function URL'
+    })
 
     new CfnOutput(this, 'CallbackFunctionUrl', {
       value: callbackFunctionUrl.url,
-      description: 'Callback Lambda Function URL',
-    });
+      description: 'Callback Lambda Function URL'
+    })
 
     new CfnOutput(this, 'AccountFunctionUrl', {
       value: accountFunctionUrl.url,
-      description: 'Account Lambda Function URL',
-    });
+      description: 'Account Lambda Function URL'
+    })
 
     // ============================================================
     // Lambda関数へのDynamoDB権限付与
     // ============================================================
 
     // Login関数: セッション作成（PutItem）
-    this.sessionTable.grantWriteData(this.loginFunction);
+    this.sessionTable.grantWriteData(this.loginFunction)
 
     // Callback関数: セッション取得・削除・保存（GetItem, DeleteItem, PutItem）
-    this.sessionTable.grantReadWriteData(this.callbackFunction);
+    this.sessionTable.grantReadWriteData(this.callbackFunction)
 
     // Account関数: セッション取得・削除（GetItem, DeleteItem）
-    this.sessionTable.grantReadWriteData(this.accountFunction);
+    this.sessionTable.grantReadWriteData(this.accountFunction)
   }
 }

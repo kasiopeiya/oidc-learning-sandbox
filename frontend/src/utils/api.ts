@@ -9,11 +9,11 @@
  */
 export interface AccountResponse {
   /** 生成された口座番号 */
-  accountNumber: string;
+  accountNumber: string
   /** ユーザーのメールアドレス */
-  email: string;
+  email: string
   /** ユーザーの一意識別子 */
-  sub: string;
+  sub: string
 }
 
 /**
@@ -21,9 +21,9 @@ export interface AccountResponse {
  */
 export interface ErrorResponse {
   /** エラーメッセージ */
-  error: string;
+  error: string
   /** エラーコード */
-  code: string;
+  code: string
 }
 
 /**
@@ -49,12 +49,11 @@ export const ERROR_MESSAGES: Record<string, string> = {
   op_error: '認証サーバーでエラーが発生しました。',
   invalid_signature: '認証情報が不正です。',
   token_expired: '認証の有効期限が切れました。もう一度お試しください。',
-  network_error: '認証サーバーとの通信に失敗しました。',
-};
+  network_error: '認証サーバーとの通信に失敗しました。'
+}
 
 /** 未定義のエラーコードに対するデフォルトメッセージ */
-export const DEFAULT_ERROR_MESSAGE =
-  '認証に失敗しました。もう一度お試しください。';
+export const DEFAULT_ERROR_MESSAGE = '認証に失敗しました。もう一度お試しください。'
 
 /**
  * エラーコードからエラーメッセージを取得
@@ -65,11 +64,11 @@ export const DEFAULT_ERROR_MESSAGE =
 export function getErrorMessage(errorCode: string | null): string {
   // エラーコードがnullまたは未定義の場合はデフォルトメッセージ
   if (!errorCode) {
-    return DEFAULT_ERROR_MESSAGE;
+    return DEFAULT_ERROR_MESSAGE
   }
 
   // エラーコードに対応するメッセージを返す
-  return ERROR_MESSAGES[errorCode] || DEFAULT_ERROR_MESSAGE;
+  return ERROR_MESSAGES[errorCode] || DEFAULT_ERROR_MESSAGE
 }
 
 /**
@@ -80,23 +79,21 @@ export function getErrorMessage(errorCode: string | null): string {
  *
  * @returns 口座情報（成功時）またはエラー（失敗時）
  */
-export async function createAccount(): Promise<
-  AccountResponse | ErrorResponse
-> {
+export async function createAccount(): Promise<AccountResponse | ErrorResponse> {
   // 口座作成APIを呼び出し
   // CookieのセッションIDが自動的に送信される
   const response = await fetch('/api/account', {
     method: 'POST',
-    credentials: 'include', // Cookieを送信するために必要
-  });
+    credentials: 'include' // Cookieを送信するために必要
+  })
 
   // JSONレスポンスをパース
-  const data = await response.json();
+  const data = await response.json()
 
   // エラーレスポンスの場合
   if (!response.ok) {
-    return data as ErrorResponse;
+    return data as ErrorResponse
   }
 
-  return data as AccountResponse;
+  return data as AccountResponse
 }

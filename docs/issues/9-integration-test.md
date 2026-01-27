@@ -50,13 +50,13 @@ integration-tests/
 
 ### テストケース
 
-| ID       | テストケース名                   | 確認観点                                   |
-| -------- | -------------------------------- | ------------------------------------------ |
-| HTTP-001 | トップページ表示                 | 静的ファイルが正しく配信されるか           |
-| HTTP-002 | 認可エンドポイントリダイレクト   | 認可URLが正しく生成されるか                |
-| HTTP-003 | 認証成功ページ表示               | コールバックページが配信されるか           |
-| HTTP-004 | エラーページ表示                 | エラーページが配信されるか                 |
-| HTTP-005 | OIDCパラメータ検証               | state/nonce/PKCEが正しく設定されるか       |
+| ID       | テストケース名                 | 確認観点                             |
+| -------- | ------------------------------ | ------------------------------------ |
+| HTTP-001 | トップページ表示               | 静的ファイルが正しく配信されるか     |
+| HTTP-002 | 認可エンドポイントリダイレクト | 認可URLが正しく生成されるか          |
+| HTTP-003 | 認証成功ページ表示             | コールバックページが配信されるか     |
+| HTTP-004 | エラーページ表示               | エラーページが配信されるか           |
+| HTTP-005 | OIDCパラメータ検証             | state/nonce/PKCEが正しく設定されるか |
 
 ### テスト実行手順
 
@@ -78,18 +78,18 @@ npm test
 
 テスト実行には以下の環境変数が必要です。`scripts/load-env.sh` で自動設定されます。
 
-| 環境変数             | 説明                                |
-| -------------------- | ----------------------------------- |
-| CLOUDFRONT_URL       | CloudFrontディストリビューションURL |
-| USER_POOL_ID         | Cognito User Pool ID                |
-| USER_POOL_CLIENT_ID  | Cognito User Pool Client ID         |
+| 環境変数            | 説明                                |
+| ------------------- | ----------------------------------- |
+| CLOUDFRONT_URL      | CloudFrontディストリビューションURL |
+| USER_POOL_ID        | Cognito User Pool ID                |
+| USER_POOL_CLIENT_ID | Cognito User Pool Client ID         |
 
 ### Cognito 固有の部分（他のOPへの移行時に変更が必要）
 
 `http.spec.ts` の HTTP-002 内の1行のみ：
 
 ```typescript
-expect(location).toContain('amazoncognito.com/oauth2/authorize');
+expect(location).toContain('amazoncognito.com/oauth2/authorize')
 ```
 
 Duende 等の他の OP に変更する場合は、この行を修正する。

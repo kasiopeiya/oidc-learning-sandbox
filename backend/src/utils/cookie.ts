@@ -15,22 +15,22 @@ export const COOKIE_NAMES = {
   /** リプレイ攻撃対策用のnonce値 */
   NONCE: 'oidc_nonce',
   /** 認可コード横取り攻撃対策用のcode_verifier（PKCE） */
-  CODE_VERIFIER: 'oidc_code_verifier',
-} as const;
+  CODE_VERIFIER: 'oidc_code_verifier'
+} as const
 
 /** Cookieの有効期限（秒）: 10分 */
-const COOKIE_MAX_AGE = 600;
+const COOKIE_MAX_AGE = 600
 
 /**
  * Cookie設定のオプション
  */
 interface CookieOptions {
   /** Cookie名 */
-  name: string;
+  name: string
   /** Cookie値 */
-  value: string;
+  value: string
   /** 有効期限（秒）。省略時はCOOKIE_MAX_AGE（600秒）を使用 */
-  maxAge?: number;
+  maxAge?: number
 }
 
 /**
@@ -46,7 +46,7 @@ interface CookieOptions {
  * @returns Set-Cookieヘッダーに設定する文字列
  */
 export function createSecureCookie(options: CookieOptions): string {
-  const { name, value, maxAge = COOKIE_MAX_AGE } = options;
+  const { name, value, maxAge = COOKIE_MAX_AGE } = options
 
   // Cookieの各属性を配列で構築し、セミコロン区切りで結合
   const attributes = [
@@ -55,10 +55,10 @@ export function createSecureCookie(options: CookieOptions): string {
     'HttpOnly', // JavaScriptからアクセス不可
     'Secure', // HTTPS接続でのみ送信
     'SameSite=Lax', // トップレベルナビゲーションからのPOST以外でクロスサイト送信を制限
-    'Path=/', // すべてのパスで有効
-  ];
+    'Path=/' // すべてのパスで有効
+  ]
 
-  return attributes.join('; ');
+  return attributes.join('; ')
 }
 
 /**
@@ -74,16 +74,12 @@ export function createSecureCookie(options: CookieOptions): string {
  * @param codeVerifier - PKCEのcode_verifier値
  * @returns Set-Cookieヘッダー値の配列
  */
-export function createOidcCookies(
-  state: string,
-  nonce: string,
-  codeVerifier: string
-): string[] {
+export function createOidcCookies(state: string, nonce: string, codeVerifier: string): string[] {
   return [
     createSecureCookie({ name: COOKIE_NAMES.STATE, value: state }),
     createSecureCookie({ name: COOKIE_NAMES.NONCE, value: nonce }),
-    createSecureCookie({ name: COOKIE_NAMES.CODE_VERIFIER, value: codeVerifier }),
-  ];
+    createSecureCookie({ name: COOKIE_NAMES.CODE_VERIFIER, value: codeVerifier })
+  ]
 }
 
 /**
@@ -96,16 +92,9 @@ export function createOidcCookies(
  * @returns Set-Cookieヘッダーに設定する文字列
  */
 export function createDeleteCookie(name: string): string {
-  const attributes = [
-    `${name}=`,
-    'Max-Age=0',
-    'HttpOnly',
-    'Secure',
-    'SameSite=Lax',
-    'Path=/',
-  ];
+  const attributes = [`${name}=`, 'Max-Age=0', 'HttpOnly', 'Secure', 'SameSite=Lax', 'Path=/']
 
-  return attributes.join('; ');
+  return attributes.join('; ')
 }
 
 /**
@@ -117,8 +106,8 @@ export function createDeleteOidcCookies(): string[] {
   return [
     createDeleteCookie(COOKIE_NAMES.STATE),
     createDeleteCookie(COOKIE_NAMES.NONCE),
-    createDeleteCookie(COOKIE_NAMES.CODE_VERIFIER),
-  ];
+    createDeleteCookie(COOKIE_NAMES.CODE_VERIFIER)
+  ]
 }
 
 /**
@@ -128,23 +117,23 @@ export function createDeleteOidcCookies(): string[] {
  * @returns Cookie名と値のマップ
  */
 export function parseCookies(cookieHeader?: string): Record<string, string> {
-  const cookies: Record<string, string> = {};
+  const cookies: Record<string, string> = {}
 
   if (!cookieHeader) {
-    return cookies;
+    return cookies
   }
 
   // セミコロンで分割して各Cookie項目を処理
   cookieHeader.split(';').forEach((cookie) => {
     // 最初の「=」で名前と値を分割（値に「=」が含まれる場合を考慮）
-    const [name, ...rest] = cookie.split('=');
-    const trimmedName = name.trim();
+    const [name, ...rest] = cookie.split('=')
+    const trimmedName = name.trim()
 
     if (trimmedName) {
       // URLエンコードされた値をデコード
-      cookies[trimmedName] = decodeURIComponent(rest.join('='));
+      cookies[trimmedName] = decodeURIComponent(rest.join('='))
     }
-  });
+  })
 
-  return cookies;
+  return cookies
 }

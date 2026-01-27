@@ -1,20 +1,14 @@
 // 1. サードパーティライブラリ
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 
 /**
  * ユーザー情報の型定義
  */
 export interface UserInfo {
   /** ユーザーのメールアドレス */
-  email: string;
+  email: string
   /** ユーザーの一意識別子（sub claim） */
-  sub: string;
+  sub: string
 }
 
 /**
@@ -22,7 +16,7 @@ export interface UserInfo {
  */
 export interface AccountInfo {
   /** 口座番号 */
-  accountNumber: string;
+  accountNumber: string
 }
 
 /**
@@ -30,23 +24,23 @@ export interface AccountInfo {
  */
 interface AuthContextType {
   /** ユーザー情報（認証済みの場合） */
-  user: UserInfo | null;
+  user: UserInfo | null
   /** 口座情報（口座作成済みの場合） */
-  account: AccountInfo | null;
+  account: AccountInfo | null
   /** ローディング状態 */
-  isLoading: boolean;
+  isLoading: boolean
   /** エラーメッセージ */
-  error: string | null;
+  error: string | null
   /** ユーザー情報を設定 */
-  setUser: (user: UserInfo | null) => void;
+  setUser: (user: UserInfo | null) => void
   /** 口座情報を設定 */
-  setAccount: (account: AccountInfo | null) => void;
+  setAccount: (account: AccountInfo | null) => void
   /** ローディング状態を設定 */
-  setIsLoading: (isLoading: boolean) => void;
+  setIsLoading: (isLoading: boolean) => void
   /** エラーを設定 */
-  setError: (error: string | null) => void;
+  setError: (error: string | null) => void
   /** 状態をリセット */
-  reset: () => void;
+  reset: () => void
 }
 
 /**
@@ -57,7 +51,7 @@ interface AuthContextType {
  * - 口座情報（accountNumber）
  * - ローディング・エラー状態
  */
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 /**
  * AuthContext Providerコンポーネント
@@ -66,24 +60,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   // ユーザー情報
-  const [user, setUser] = useState<UserInfo | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null)
 
   // 口座情報
-  const [account, setAccount] = useState<AccountInfo | null>(null);
+  const [account, setAccount] = useState<AccountInfo | null>(null)
 
   // ローディング状態
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false)
 
   // エラー状態
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null)
 
   // 状態をリセットする関数
   const reset = useCallback(() => {
-    setUser(null);
-    setAccount(null);
-    setIsLoading(false);
-    setError(null);
-  }, []);
+    setUser(null)
+    setAccount(null)
+    setIsLoading(false)
+    setError(null)
+  }, [])
 
   // Context値を構築
   const value: AuthContextType = {
@@ -95,10 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccount,
     setIsLoading,
     setError,
-    reset,
-  };
+    reset
+  }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 /**
@@ -108,12 +102,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
  * @throws AuthProvider外で使用された場合にエラー
  */
 export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
+  const context = useContext(AuthContext)
 
   // AuthProvider外で使用された場合はエラー
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider')
   }
 
-  return context;
+  return context
 }

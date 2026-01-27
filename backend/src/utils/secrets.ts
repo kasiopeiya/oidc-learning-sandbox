@@ -5,10 +5,7 @@
  * Lambda のウォームスタート時にキャッシュすることで、
  * Secrets Manager API の呼び出しを削減する。
  */
-import {
-  GetSecretValueCommand,
-  SecretsManagerClient,
-} from '@aws-sdk/client-secrets-manager'
+import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager'
 
 /**
  * Secrets Manager クライアント（Lambda コンテナで再利用）
@@ -42,7 +39,7 @@ async function getSecret(secretName: string): Promise<string> {
   try {
     const response = await client.send(
       new GetSecretValueCommand({
-        SecretId: secretName,
+        SecretId: secretName
       })
     )
 
@@ -59,7 +56,7 @@ async function getSecret(secretName: string): Promise<string> {
   } catch (error) {
     console.error('Failed to fetch secret from Secrets Manager', {
       secretName,
-      error,
+      error
     })
     throw error
   }

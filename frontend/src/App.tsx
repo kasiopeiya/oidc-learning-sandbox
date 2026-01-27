@@ -1,11 +1,11 @@
 // 1. サードパーティライブラリ
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom'
 
 // 2. 自作モジュール
-import { AuthProvider } from './contexts/AuthContext';
-import { IndexPage } from './pages/IndexPage';
-import { CallbackPage } from './pages/CallbackPage';
-import { ErrorPage } from './pages/ErrorPage';
+import { AuthProvider } from './contexts/AuthContext'
+import { IndexPage } from './pages/IndexPage'
+import { CallbackPage } from './pages/CallbackPage'
+import { ErrorPage } from './pages/ErrorPage'
 
 /**
  * アプリケーションのルートコンポーネント
@@ -32,5 +32,5 @@ export function App() {
         <Route path="/error" element={<ErrorPage />} />
       </Routes>
     </AuthProvider>
-  );
+  )
 }
