@@ -1,6 +1,7 @@
 import * as path from 'path'
 
-import { CfnOutput, Duration, Fn, RemovalPolicy, SecretValue, Stack, StackProps } from 'aws-cdk-lib'
+import type { StackProps } from 'aws-cdk-lib'
+import { CfnOutput, Duration, RemovalPolicy, SecretValue, Stack } from 'aws-cdk-lib'
 import { aws_cloudfront as cloudfront } from 'aws-cdk-lib'
 import { aws_cloudfront_origins as origins } from 'aws-cdk-lib'
 import { aws_cognito as cognito } from 'aws-cdk-lib'
@@ -350,43 +351,44 @@ export class OidcSandboxStack extends Stack {
 
     // Login Lambda Function URL
     // - CloudFront から直接 Lambda を呼び出すためのエンドポイント
+    // - authType: AWS_IAM により、CloudFront OAC 経由でのみアクセス可能
     const loginFunctionUrl = this.loginFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE
+      authType: lambda.FunctionUrlAuthType.AWS_IAM
     })
 
     // Callback Lambda Function URL
     const callbackFunctionUrl = this.callbackFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE
+      authType: lambda.FunctionUrlAuthType.AWS_IAM
     })
 
     // Account Lambda Function URL
     const accountFunctionUrl = this.accountFunction.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE
+      authType: lambda.FunctionUrlAuthType.AWS_IAM
     })
 
     // ============================================================
     // CloudFront ビヘイビアの追加（Lambda Function URLs 用）
     // ============================================================
 
-    // Lambda Function URL のホスト名を抽出
-    // 例: https://xxxxxxxxxx.lambda-url.ap-northeast-1.on.aws/
-    // → xxxxxxxxxx.lambda-url.ap-northeast-1.on.aws
-    const loginFunctionUrlHost = Fn.select(2, Fn.split('/', loginFunctionUrl.url))
-    const callbackFunctionUrlHost = Fn.select(2, Fn.split('/', callbackFunctionUrl.url))
-    const accountFunctionUrlHost = Fn.select(2, Fn.split('/', accountFunctionUrl.url))
+    // FunctionUrlOrigin.withOriginAccessControl を使用することで OAC が自動設定される
+    // これにより CloudFront 経由でのみ Lambda Function URL にアクセス可能になる
 
     // /api/auth/login パスを Login Lambda Function URL に転送
-    this.distribution.addBehavior('/api/auth/login', new origins.HttpOrigin(loginFunctionUrlHost), {
-      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-      allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD
-    })
+    this.distribution.addBehavior(
+      '/api/auth/login',
+      origins.FunctionUrlOrigin.withOriginAccessControl(loginFunctionUrl),
+      {
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD
+      }
+    )
 
     // /api/auth/callback パスを Callback Lambda Function URL に転送
     this.distribution.addBehavior(
       '/api/auth/callback',
-      new origins.HttpOrigin(callbackFunctionUrlHost),
+      origins.FunctionUrlOrigin.withOriginAccessControl(callbackFunctionUrl),
       {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
@@ -396,12 +398,16 @@ export class OidcSandboxStack extends Stack {
     )
 
     // /api/account パスを Account Lambda Function URL に転送
-    this.distribution.addBehavior('/api/account', new origins.HttpOrigin(accountFunctionUrlHost), {
-      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL
-    })
+    this.distribution.addBehavior(
+      '/api/account',
+      origins.FunctionUrlOrigin.withOriginAccessControl(accountFunctionUrl),
+      {
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL
+      }
+    )
 
     // ============================================================
     // SSM Parameter Store（CloudFront URL の保存）
