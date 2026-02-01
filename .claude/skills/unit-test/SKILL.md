@@ -1,60 +1,58 @@
 ---
 name: unit-test
 description: Run unit tests for backend and frontend directories
-disable-model-invocation: true
 ---
 
 # Unit Test Runner
 
-Backend と Frontend の単体テストを実行し、結果を分析します。
+Backend と Frontend の単体テストを実行し、詳細に分析するスキルです。
 
-## 実行ステップ
+このスキルは、`unit-test-runner` サブエージェントを呼び出して、以下の処理を実行します：
+
+## 処理内容
 
 ### 1. Backend テスト実行
-
-Backend ディレクトリに移動して、Vitest を使用したテスト実行：
-
-```bash
-cd backend && npm test
-```
-
-**期待される動作**：
-- すべてのテストファイル（`*.test.ts`）が実行される
-- テスト結果サマリーが表示される
-- 失敗があれば詳細なエラーメッセージが表示される
+- Backend ディレクトリの Vitest テストを実行
+- 全テストファイルを自動実行
+- テスト結果をキャプチャ
 
 ### 2. Frontend テスト実行
+- Frontend ディレクトリの Vitest + React Testing Library テストを実行
+- 全テストファイルを自動実行
+- テスト結果をキャプチャ
 
-Frontend ディレクトリに移動して、Vitest + React Testing Library によるテスト実行：
+### 3. 詳細レポート生成
+- Backend/Frontend の成功/失敗を分析
+- 失敗テストの根本原因を特定
+- 修正提案を提供
 
-```bash
-cd frontend && npm test
+## 使用方法
+
+### 基本的な実行
+```
+/unit-test
 ```
 
-**期待される動作**：
-- すべてのテストファイル（`*.test.ts`, `*.test.tsx`）が実行される
-- React コンポーネントのテスト結果が表示される
-- 失敗があれば詳細なエラーメッセージが表示される
+このコマンドを実行すると、`unit-test-runner` サブエージェントが起動し、以下の処理を自動実行します：
 
-### 3. 結果分析とレポート
+1. Backend のテスト実行
+2. Frontend のテスト実行
+3. 結果の分析
+4. 詳細レポートの生成
 
-テスト実行後、以下の情報をまとめてレポートしてください：
+### テスト修正が必要な場合
 
-**サマリー情報**：
-- Backend: 合計テスト数、成功数、失敗数
-- Frontend: 合計テスト数、成功数、失敗数
-- 全体の成功率
+失敗したテストに対して、以下のように指示してください：
 
-**失敗テストの詳細分析**（失敗がある場合）：
-- テストファイル名と場所
-- 失敗したテスト名
-- Expected vs Actual の結果
-- スタックトレース
-- 推奨される修正方針
+```
+/unit-test で実行して、失敗したテストを修正してください
+```
 
-**その他**：
-- テスト実行に要した時間
-- 警告メッセージ（存在する場合）
+サブエージェントが自動的に以下を実行します：
+1. ソースコードを読取
+2. 問題の原因を特定
+3. コードを修正
+4. テストを再実行して確認
 
 ## 使用技術
 
@@ -64,8 +62,6 @@ cd frontend && npm test
 | コマンド | npm test | npm test |
 | 設定ファイル | vitest.config.ts | vitest.config.ts |
 
-## トラブルシューティング
+## 詳細なエージェント仕様
 
-- **node_modules がない場合**: `npm install` を先に実行してください
-- **TypeScript エラー**: 各ディレクトリで `npm run build` を実行し、型チェックしてください
-- **テスト失敗が続く場合**: ソースコード `src/` ディレクトリを確認し、修正が必要かどうか判断してください
+テストの実行・分析・修正の詳細は、`.claude/agents/unit-test-runner/` で定義されています。
