@@ -18,10 +18,10 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
 
 ### 主要コマンド
 
-CDKコマンド実行前にtscによるビルドは実行しないこと、必要ありません
+CDKコマンド実行前にtscによるビルドは実行しないこと
 
 ```bash
-cd cdk && npx cdk deploy
+cd cdk && source deploy.sh
 ```
 
 ## 技術スタック

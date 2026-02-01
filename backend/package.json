@@ -1,6 +1,7 @@
 {
   "name": "oidc-sandbox-backend",
   "version": "1.0.0",
+  "type": "module",
   "description": "OIDC学習サンドボックス - バックエンド（Lambda関数）",
   "main": "src/handlers/login.ts",
   "scripts": {
