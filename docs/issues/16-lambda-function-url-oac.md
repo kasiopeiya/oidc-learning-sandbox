@@ -25,6 +25,7 @@ CloudFront
 ```
 
 **問題点:**
+
 - Lambda Function URLが公開されており、CloudFrontをバイパスして直接呼び出せる
 - CloudFrontで設定したWAFやレート制限が回避される可能性がある
 
@@ -38,6 +39,7 @@ CloudFront (OAC設定)
 ```
 
 **セキュリティ強化:**
+
 - Lambda Function URLはIAM認証必須となり、直接アクセスは拒否される
 - CloudFrontがOACを使用してIAM署名付きリクエストを送信
 
@@ -89,9 +91,11 @@ CloudFront (OAC設定)
 ### 技術的な注意点
 
 1. **OACの仕組み**
+
    ```
    ユーザー → CloudFront → (OAC: SigV4署名) → Lambda Function URL (AWS_IAM認証)
    ```
+
    CloudFrontがリクエストに署名を付与し、LambdaがIAM認証で検証する
 
 2. **CDK L2 Constructの使用**
@@ -109,10 +113,10 @@ CloudFront (OAC設定)
 
 ### 対象ファイル
 
-| 操作 | ファイル                            |
-| ---- | ----------------------------------- |
-| 修正 | `cdk/lib/oidc-sandbox-stack.ts`     |
-| 修正 | `docs/infrastructure-design.md`     |
+| 操作 | ファイル                                                         |
+| ---- | ---------------------------------------------------------------- |
+| 修正 | `cdk/lib/oidc-sandbox-stack.ts`                                  |
+| 修正 | `docs/infrastructure-design.md`                                  |
 | 修正 | `docs/issues/14-lambda-function-urls.md`（技術的な注意点の更新） |
 
 ### 参考資料

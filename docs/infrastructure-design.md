@@ -186,10 +186,10 @@ S3 と API Gateway の前段に配置し、単一ドメインで HTTPS コンテ
 
 #### 3.3.3 オリジン設定
 
-| オリジン           | 転送先                              | 説明               |
-| ------------------ | ----------------------------------- | ------------------ |
-| S3 オリジン        | S3 バケット（OAC 経由）             | 静的ファイル配信用 |
-| Lambda オリジン x3 | Lambda Function URLs（OAC 経由）    | バックエンド API用 |
+| オリジン           | 転送先                           | 説明               |
+| ------------------ | -------------------------------- | ------------------ |
+| S3 オリジン        | S3 バケット（OAC 経由）          | 静的ファイル配信用 |
+| Lambda オリジン x3 | Lambda Function URLs（OAC 経由） | バックエンド API用 |
 
 #### 3.3.4 ビヘイビア（振り分けルール）
 
@@ -205,11 +205,13 @@ S3 と API Gateway の前段に配置し、単一ドメインで HTTPS コンテ
 CloudFront からオリジン（S3 や Lambda Function URL）にアクセスするための仕組みです。
 
 **S3 オリジンの場合:**
+
 ```
 ユーザー → CloudFront → (OAC: 署名付きリクエスト) → S3
 ```
 
 **Lambda Function URL の場合:**
+
 ```
 ユーザー → CloudFront → (OAC: SigV4署名) → Lambda Function URL (AWS_IAM認証)
 ```
@@ -419,14 +421,14 @@ export const devParameter: AppParameter = {
 
 ### 7.1 実装済みのセキュリティ対策
 
-| 対策                  | 説明                                          |
-| --------------------- | --------------------------------------------- |
-| HTTPS 強制            | CloudFront で HTTP → HTTPS リダイレクト       |
-| S3 非公開             | OAC 経由でのみアクセス可能                    |
-| Lambda Function URL   | OAC + AWS_IAM 認証で CloudFront 経由のみ許可  |
-| PKCE                  | 認可コード横取り攻撃を防止                    |
-| State パラメータ      | CSRF 攻撃を防止                               |
-| Nonce パラメータ      | リプレイ攻撃を防止                            |
+| 対策                | 説明                                         |
+| ------------------- | -------------------------------------------- |
+| HTTPS 強制          | CloudFront で HTTP → HTTPS リダイレクト      |
+| S3 非公開           | OAC 経由でのみアクセス可能                   |
+| Lambda Function URL | OAC + AWS_IAM 認証で CloudFront 経由のみ許可 |
+| PKCE                | 認可コード横取り攻撃を防止                   |
+| State パラメータ    | CSRF 攻撃を防止                              |
+| Nonce パラメータ    | リプレイ攻撃を防止                           |
 
 ### 7.2 学習用途のため簡略化した項目
 

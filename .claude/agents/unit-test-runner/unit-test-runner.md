@@ -20,6 +20,7 @@ Backend と Frontend の単体テストを実行し、詳細に分析・レポ�
 3. テスト結果をキャプチャして分析
 
 **確認項目**：
+
 - テスト合計数
 - 成功数、失敗数
 - 成功率の計算
@@ -34,6 +35,7 @@ Backend と Frontend の単体テストを実行し、詳細に分析・レポ�
 3. テスト結果をキャプチャして分析
 
 **確認項目**：
+
 - テスト合計数
 - 成功数、失敗数
 - 成功率の計算
@@ -44,6 +46,7 @@ Backend と Frontend の単体テストを実行し、詳細に分析・レポ�
 テスト実行後、以下の形式で詳細レポートを生成：
 
 #### サマリーセクション
+
 ```
 === UNIT TEST RESULTS ===
 
@@ -120,12 +123,12 @@ Frontend Tests
 
 ## テクノロジースタック参考
 
-| 項目 | Backend | Frontend |
-|-----|---------|----------|
-| フレームワーク | Vitest 3.0.0 | Vitest 3.0.0 |
-| テストライブラリ | AWS SDK Mocks | React Testing Library |
-| 言語 | TypeScript | TypeScript + React |
-| 設定 | vitest.config.ts | vitest.config.ts |
+| 項目             | Backend          | Frontend              |
+| ---------------- | ---------------- | --------------------- |
+| フレームワーク   | Vitest 3.0.0     | Vitest 3.0.0          |
+| テストライブラリ | AWS SDK Mocks    | React Testing Library |
+| 言語             | TypeScript       | TypeScript + React    |
+| 設定             | vitest.config.ts | vitest.config.ts      |
 
 ## エラーハンドリング
 
