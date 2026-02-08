@@ -452,6 +452,123 @@ Grep tool を使用して特定のパターンを検索：
 - ライブラリが存在しない → ✗ 不整合
 - メジャーバージョンが異なる → ⚠ 警告
 
+#### 検証ロジック8: シーケンス図の整合性（Backend）
+
+このロジックは、設計書にシーケンス図が含まれる場合にのみ実行されます。
+
+**検証項目8-1: エンドポイントの整合性**
+
+**手順**:
+
+1. シーケンス図から抽出した HTTP エンドポイント一覧を取得
+2. 各エンドポイントに対応する実装が存在するか確認
+3. テーブル定義のエンドポイントとも照合
+
+**抽出対象**:
+
+- シーケンス図のメッセージから `GET /api/auth/login` などのパターンを抽出
+- `/api/` で始まるエンドポイントを Backend の実装対象として認識
+
+**判定基準**:
+
+- シーケンス図のエンドポイントがハンドラーファイルに存在する → ✓ 整合
+- シーケンス図のエンドポイントが実装に存在しない → ✗ エラー
+- 実装にあるがシーケンス図にない → ⚠ 警告（主要フローでない可能性）
+
+**検証項目8-2: DynamoDB操作の整合性**
+
+**手順**:
+
+1. シーケンス図から抽出した DynamoDB 操作一覧を取得（PutItem, GetItem など）
+2. `backend/src/utils/session.ts` や各ハンドラーから DynamoDB 操作を Grep で抽出
+3. 双方向で照合
+
+**抽出パターン（実装側）**:
+
+```
+パターン: (PutCommand|GetCommand|UpdateCommand|DeleteCommand)
+ファイル: backend/src/utils/*.ts, backend/src/handlers/*.ts
+```
+
+**判定基準**:
+
+- シーケンス図の操作が実装に存在する → ✓ 整合
+- シーケンス図の操作が実装に存在しない → ✗ エラー
+- シーケンス図に `PutItem(sessionId, state, nonce)` とあるが、実装では `state` が保存されていない → ✗ エラー
+
+**検証項目8-3: セキュリティデータ項目の整合性**
+
+**手順**:
+
+1. シーケンス図から抽出したデータ項目一覧を取得（state, nonce, verifier, challenge など）
+2. 実装ファイルから該当する変数名やパラメータを Grep で抽出
+3. 主要なセキュリティ項目の使用を確認
+
+**重点検証項目**:
+
+- `state`: CSRF 対策（生成・保存・検証の3ステップが実装されているか）
+- `nonce`: リプレイ攻撃対策（生成・保存・検証の3ステップが実装されているか）
+- `verifier` / `challenge`: PKCE（生成・保存・使用が実装されているか）
+- `code`: 認可コード（受け取り・トークン交換が実装されているか）
+
+**判定基準**:
+
+- シーケンス図の項目が実装で適切に使用されている → ✓ 整合
+- シーケンス図にあるが実装で使用されていない → ✗ エラー（セキュリティ機能の欠落）
+- 実装にあるがシーケンス図にない → ⚠ 警告（ドキュメント不足）
+
+**検証項目8-4: 処理フローの順序整合性**
+
+**手順**:
+
+1. シーケンス図から処理の順序を抽出（autonumber に基づく）
+2. 実装ファイルのコードフローと比較（特に重要な検証ステップ）
+
+**検証ポイント**:
+
+Backend (`callback.ts`) の処理順序:
+
+1. Cookie から sessionId を取得
+2. DynamoDB から state, nonce, verifier を取得
+3. **State 検証**（URL の state と DynamoDB の state を照合）
+4. トークンエンドポイントへ POST（code + verifier を送信）
+5. **Nonce 検証**（ID Token の nonce と DynamoDB の nonce を照合）
+6. アクセストークンを DynamoDB に保存
+7. フロントエンドにリダイレクト
+
+**判定基準**:
+
+- 重要な検証ステップが正しい順序で実装されている → ✓ 整合
+- State 検証がトークン交換より後に実装されている → ✗ エラー（脆弱性）
+- Nonce 検証が実装されていない → ✗ エラー（セキュリティ欠陥）
+
+**検証項目8-5: リダイレクトフローの整合性**
+
+**手順**:
+
+1. シーケンス図から `302 Redirect` パターンを抽出
+2. 実装から `redirect` や `statusCode: 302` を Grep で抽出
+3. リダイレクト先の URL を確認
+
+**抽出例**:
+
+シーケンス図:
+
+- `L1-->>Browser: 302 Redirect + Set-Cookie(sessionId)` → OP の認可エンドポイントへ
+- `OP-->>Browser: 302 Redirect (code, state)` → `/callback` へ
+- `L2-->>Browser: 302 Redirect to /callback` → フロントエンドへ
+
+実装:
+
+- `login.ts`: `statusCode: 302, headers: { Location: authorizeUrl }`
+- `callback.ts`: `statusCode: 302, headers: { Location: '/callback' }`
+
+**判定基準**:
+
+- シーケンス図のリダイレクトが実装に存在する → ✓ 整合
+- シーケンス図のリダイレクトが実装に存在しない → ✗ エラー
+- Cookie 設定（`Set-Cookie`）がシーケンス図にあるが実装にない → ✗ エラー
+
 ---
 
 ### Phase 5: レポート生成
@@ -489,6 +606,11 @@ interface ValidationIssue {
   ✓ Backend: エラーコード定義 (12/12)
   ✓ Backend: DynamoDBスキーマ (6/6)
   ✓ Backend: 環境変数 (5/5)
+  ✓ Backend: シーケンス図 - エンドポイント整合性 (3/3)
+  ✓ Backend: シーケンス図 - DynamoDB操作整合性 (3/3)
+  ✓ Backend: シーケンス図 - セキュリティデータ項目 (4/4)
+  ✓ Backend: シーケンス図 - 処理フロー順序 (適切)
+  ✓ Backend: シーケンス図 - リダイレクトフロー (2/2)
   ✓ Frontend: 画面/コンポーネント定義 (3/3)
   ✓ Frontend: ルーティング定義 (3/3)
   ✓ Frontend: 技術スタック (4/4)
@@ -524,6 +646,22 @@ interface ValidationIssue {
    - 設計書: docs/backend-design.md の環境変数一覧に記載なし
    - 推奨対応: 設計書の環境変数一覧に追記してください
 
+📊 Backend: シーケンス図の整合性
+
+3. シーケンス図に記載されているが実装に存在しない [ERROR]
+   - データ項目: nonce（検証処理）
+   - 設計書: docs/backend-design.md (シーケンス図: ステップ 82「Nonce照合」)
+   - 実装: backend/src/handlers/callback.ts に nonce の検証処理が見つかりません
+   - 推奨対応: ID Token の nonce クレームと DynamoDB の nonce を照合する処理を追加してください
+   - セキュリティ影響: リプレイ攻撃のリスクあり
+
+4. 処理順序が不適切 [ERROR]
+   - 項目: State 検証の位置
+   - 設計書: docs/backend-design.md (シーケンス図: ステップ 72「State照合」はトークン交換前)
+   - 実装: backend/src/handlers/callback.ts の State 検証がトークン交換後に実装されています
+   - 推奨対応: State 検証をトークン交換処理より前に移動してください
+   - セキュリティ影響: CSRF 攻撃のリスクあり
+
 ---
 
 整合性のある項目:
@@ -531,12 +669,16 @@ interface ValidationIssue {
   ✓ Backend: DynamoDBスキーマ (6/6)
   ✗ Backend: エラーコード定義 (11/12 - 1件不整合)
   ⚠ Backend: 環境変数 (5/6 - 1件警告)
+  ✗ Backend: シーケンス図 - セキュリティデータ項目 (3/4 - nonce検証欠落)
+  ✗ Backend: シーケンス図 - 処理フロー順序 (State検証の位置が不適切)
 
 ---
 
 推奨アクション:
 1. backend/src/handlers/account.ts に account_generation_error のエラーハンドリングを追加
 2. docs/backend-design.md の環境変数一覧に LOG_LEVEL を追記
+3. 🔒 [セキュリティ] backend/src/handlers/callback.ts に nonce 検証処理を追加（リプレイ攻撃対策）
+4. 🔒 [セキュリティ] backend/src/handlers/callback.ts の State 検証をトークン交換前に移動（CSRF 対策）
 ```
 
 #### ステップ 5-4: 複数タイプの検証時の出力
@@ -586,11 +728,19 @@ Backend と Frontend の両方を検証した場合：
 すべての検証項目で整合性が確認されました。
 
 ### Validation Summary
-- Backend: 4項目検証、すべて整合
+- Backend: 9項目検証、すべて整合（テーブル定義4項目 + シーケンス図5項目）
 - Frontend: 3項目検証、すべて整合
 
 ### Details
 （検証項目の詳細）
+
+**シーケンス図検証について**:
+設計書にシーケンス図が含まれる場合、以下の5つの項目を追加で検証します：
+1. エンドポイント整合性
+2. DynamoDB操作整合性
+3. セキュリティデータ項目（state, nonce, verifier, code）
+4. 処理フロー順序（特にセキュリティ検証の順序）
+5. リダイレクトフロー
 ```
 
 ### 不整合検出時
