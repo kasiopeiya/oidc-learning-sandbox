@@ -73,9 +73,188 @@ file_path: <最新ファイルのパス>
 
   → 処理を中止
 
+#### ステップ 1-4: Planファイルのdocs/planへのコピー
+
+Bash ツールでPlanファイルを `docs/plan/` にコピー:
+
+```bash
+cp <最新Planファイルのパス> docs/plan/<Planファイル名>
+```
+
+**例**:
+
+```bash
+cp ~/.claude/plans/stateful-purring-pond.md docs/plan/stateful-purring-pond.md
+```
+
+**目的**:
+
+- トレーサビリティ確保（IssueからPlanへの参照を可能にする）
+- Planファイルの永続化（`~/.claude/plans/`は一時的なディレクトリのため）
+
+**エラーハンドリング**:
+
+- `docs/plan/` ディレクトリが存在しない場合 → `mkdir -p docs/plan` で作成
+- コピー失敗の場合 → 警告のみ表示、処理は継続
+
+---
+
+### Phase 1.5: 複数Issue分割の確認と設定
+
+#### ステップ 1.5-1: Planのセクション構造解析
+
+Planファイルから見出しレベル2（`## `）のセクション一覧を抽出:
+
+**抽出ロジック**:
+
+- 正規表現: `^## (.+)$`
+- 対象: Planファイル全体
+- 各見出しの行番号とタイトルを保持
+
+**出力例**:
+
+```
+セクション一覧:
+  1. ## 概要 (行3)
+  2. ## Critical Files (行10)
+  3. ## Phase 1: インフラ基盤構築 (行25)
+  4. ## Phase 2: バックエンド実装 (行45)
+  5. ## Phase 3: フロントエンド実装 (行65)
+  6. ## Verification (行85)
+```
+
+#### ステップ 1.5-2: 複数Issue分割の確認
+
+AskUserQuestion ツールで分割するか確認:
+
+**質問内容**:
+
+```
+question: "このPlanを複数のIssueに分割しますか？"
+header: "Issue分割"
+options: [
+  { label: "1つのIssueとして作成（デフォルト）", description: "Plan全体を1つのIssueとして作成します" },
+  { label: "複数のIssueに分割", description: "Planを複数のIssueに分割して作成します" }
+]
+multiSelect: false
+```
+
+**分岐処理**:
+
+- 「1つのIssueとして作成」を選択 → Phase 2に進む（従来の単一Issue作成フロー）
+- 「複数のIssueに分割」を選択 → ステップ 1.5-3に進む
+
+#### ステップ 1.5-3: Issue分割位置の決定
+
+**反復的な質問**:
+
+各Issueの開始位置をユーザーに確認（Issue 2から開始）:
+
+```
+question: "Issue {N} の開始セクションを選択してください（Issue {N-1} はセクション {M} まで）。終了する場合は「これ以上分割しない」を選択してください。"
+header: "Issue {N} 開始位置"
+options: [
+  { label: "これ以上分割しない", description: "残りのセクションをIssue {N-1} に含めます" },
+  { label: "{セクション番号}: {セクションタイトル}", description: "このセクションから Issue {N} を開始" },
+  ...（残りのセクションを選択肢として列挙）
+]
+multiSelect: false
+```
+
+**例（Issue 2の場合）**:
+
+```
+question: "Issue 2 の開始セクションを選択してください（Issue 1 はセクション 1-2 まで）。終了する場合は「これ以上分割しない」を選択してください。"
+header: "Issue 2 開始位置"
+options: [
+  { label: "これ以上分割しない", description: "残りのセクションをIssue 1に含めます" },
+  { label: "3: Phase 1: インフラ基盤構築", description: "このセクションから Issue 2 を開始" },
+  { label: "4: Phase 2: バックエンド実装", description: "このセクションから Issue 2 を開始" },
+  { label: "5: Phase 3: フロントエンド実装", description: "このセクションから Issue 2 を開始" },
+  { label: "6: Verification", description: "このセクションから Issue 2 を開始" }
+]
+```
+
+**処理ロジック**:
+
+1. Issue 2の開始位置をユーザーに質問
+2. ユーザーが選択したセクション番号を記録
+3. 「これ以上分割しない」が選択されるまで、Issue 3, Issue 4... と繰り返す
+4. 最大10個のIssueまで対応（無限ループ防止）
+
+**分割情報の保持**:
+
+```
+分割情報 = [
+  { issueNumber: 1, startSection: 1, endSection: 2, title: "概要とファイル構成" },
+  { issueNumber: 2, startSection: 3, endSection: 4, title: "Phase 1-2 実装" },
+  { issueNumber: 3, startSection: 5, endSection: 6, title: "Phase 3とテスト" }
+]
+```
+
+**タイトルの生成**:
+
+- 各Issue範囲の最初のセクションタイトルを基にタイトルを自動生成
+- 例: セクション「Phase 1: インフラ基盤構築」→ タイトル「Phase 1: インフラ基盤構築」
+- 元のPlanタイトルをプレフィックスとして付ける場合もある（例: 「初期構築 - Phase 1: インフラ基盤構築」）
+
+#### ステップ 1.5-4: 分割内容の確認
+
+分割情報を表示し、ユーザーに最終確認:
+
+**確認メッセージ**:
+
+```
+=== Issue分割プレビュー ===
+
+以下の {N} 個のIssueを作成します:
+
+Issue #17: 概要とファイル構成
+  範囲: セクション 1-2
+  - ## 概要
+  - ## Critical Files
+
+Issue #18: Phase 1-2 実装
+  範囲: セクション 3-4
+  - ## Phase 1: インフラ基盤構築
+  - ## Phase 2: バックエンド実装
+
+Issue #19: Phase 3とテスト
+  範囲: セクション 5-6
+  - ## Phase 3: フロントエンド実装
+  - ## Verification
+
+続行しますか？
+```
+
+AskUserQuestion で確認:
+
+```
+question: "この分割でIssueを作成しますか？"
+header: "最終確認"
+options: [
+  { label: "はい、作成します", description: "上記の分割でIssueを作成します" },
+  { label: "いいえ、やり直します", description: "分割設定をやり直します" }
+]
+```
+
+**分岐処理**:
+
+- 「はい」→ Phase 2に進む（各分割に対してIssue生成を実行）
+- 「いいえ」→ ステップ 1.5-2に戻る（分割設定をやり直す）
+
+**エラーハンドリング**:
+
+- やり直しが3回以上繰り返された場合 → 単一Issueとして作成するか確認
+
 ---
 
 ### Phase 2: Issue番号の自動採番
+
+**重要**: Phase 1.5で決定した分割情報に基づき、各Issueに対して以下の処理を実行します。
+
+- **単一Issue作成の場合**: 1回だけ実行
+- **複数Issue作成の場合**: 各分割に対して連番でIssue番号を採番
 
 #### ステップ 2-1: 既存Issueファイルの検出
 
@@ -102,7 +281,9 @@ ls docs/issues/ 2>/dev/null | grep -E '^[0-9]+' | sed 's/-.*//' | sort -n | tail
 - Issueファイルが存在しない場合（出力が空）→ 番号を `1` に設定
 - `docs/issues/` ディレクトリが存在しない場合 → 番号を `1` に設定
 
-#### ステップ 2-3: 新しいIssue番号の決定
+#### ステップ 2-3: 各Issueの番号決定
+
+**単一Issue作成の場合**:
 
 ```
 新しいIssue番号 = 最大番号 + 1
@@ -110,15 +291,28 @@ ls docs/issues/ 2>/dev/null | grep -E '^[0-9]+' | sed 's/-.*//' | sort -n | tail
 
 例: 最大番号が `16` → 新しい番号は `17`
 
+**複数Issue作成の場合**:
+
+```
+Issue 1の番号 = 最大番号 + 1
+Issue 2の番号 = 最大番号 + 2
+Issue 3の番号 = 最大番号 + 3
+...
+```
+
+例: 最大番号が `16`、3個のIssueを作成 → `17`, `18`, `19`
+
 ---
 
 ### Phase 3: タイトルとスラッグの生成
 
+**重要**: 各Issue分割に対して個別にタイトルとスラッグを生成します。
+
 #### ステップ 3-1: タイトルの抽出
 
-Planファイルから先頭の見出し（`# タイトル`）を抽出:
+**単一Issue作成の場合**:
 
-**抽出ロジック**:
+Planファイルから先頭の見出し（`# タイトル`）を抽出:
 
 - 正規表現: `^# (.+)$`
 - 対象: Planファイルの最初の50行
@@ -132,10 +326,51 @@ Planファイルから先頭の見出し（`# タイトル`）を抽出:
 
 → タイトル: `/create-issue` スキル実装プラン
 
+**複数Issue作成の場合**:
+
+各Issue範囲の最初のセクション（`## `）をタイトルとして使用:
+
+**タイトル生成ロジック**:
+
+1. 元のPlanタイトル（`# タイトル`）を抽出
+2. 各Issue範囲の最初のセクションタイトルを抽出
+3. 組み合わせてタイトルを生成
+
+**生成パターン**:
+
+- **パターンA（推奨）**: `{セクションタイトル}`
+  - 例: `Phase 1: インフラ基盤構築`
+
+- **パターンB（Planタイトルも含める場合）**: `{Planタイトル} - {セクションタイトル}`
+  - 例: `初期構築プラン - Phase 1: インフラ基盤構築`
+
+**どちらを使用するか**:
+
+- セクションタイトルが十分に説明的な場合 → パターンA
+- セクションタイトルが短い場合（「概要」など） → パターンB
+
+**例**:
+
+```
+Issue 1: セクション 1-2
+  最初のセクション: ## 概要
+  → タイトル: 初期構築プラン - 概要
+
+Issue 2: セクション 3-4
+  最初のセクション: ## Phase 1: インフラ基盤構築
+  → タイトル: Phase 1: インフラ基盤構築
+
+Issue 3: セクション 5-6
+  最初のセクション: ## Phase 3: フロントエンド実装
+  → タイトル: Phase 3: フロントエンド実装
+```
+
 **エラーハンドリング**:
 
 - タイトルが見つからない場合 → Planファイル名（拡張子 `.md` を除く）をタイトルとして使用
   - 例: `stateful-purring-pond.md` → タイトル: `stateful-purring-pond`
+- 複数Issue作成で最初のセクションが取得できない場合 → `{Planタイトル} - Part {N}` を使用
+  - 例: `初期構築プラン - Part 2`
 
 #### ステップ 3-2: スラッグの生成
 
@@ -177,11 +412,13 @@ Planファイルから先頭の見出し（`# タイトル`）を抽出:
 
 ### Phase 4: 依存関係とラベルの対話的入力
 
+**重要**: 各Issue分割に対して個別に依存関係とラベルを入力します。
+
 #### ステップ 4-1: 依存関係の入力
 
-AskUserQuestion ツールで依存関係を質問:
+**単一Issue作成の場合**:
 
-**質問内容**:
+AskUserQuestion ツールで依存関係を質問:
 
 ```
 question: "依存するIssue番号を入力してください（カンマ区切り、例: 14, 15）。依存関係がない場合は空のままEnterを押してください。"
@@ -191,6 +428,39 @@ options: [
   { label: "カスタム入力", description: "Issue番号をカンマ区切りで入力" }
 ]
 ```
+
+**複数Issue作成の場合**:
+
+各Issueに対して質問（Issue 2以降は前のIssueへの依存を自動提案）:
+
+**Issue 1の場合**:
+
+```
+question: "Issue #17 の依存関係を入力してください（カンマ区切り）。依存関係がない場合は「なし」を選択してください。"
+header: "依存関係 (Issue #17)"
+options: [
+  { label: "なし", description: "依存関係がない場合はこちらを選択" },
+  { label: "カスタム入力", description: "Issue番号をカンマ区切りで入力" }
+]
+```
+
+**Issue 2以降の場合**:
+
+```
+question: "Issue #18 の依存関係を入力してください。前のIssue (#17) への依存を推奨します。"
+header: "依存関係 (Issue #18)"
+options: [
+  { label: "前のIssueに依存 (#17)（推奨）", description: "Issue #17 に依存します" },
+  { label: "なし", description: "依存関係がない場合はこちらを選択" },
+  { label: "カスタム入力", description: "Issue番号をカンマ区切りで入力" }
+]
+```
+
+**処理ロジック**:
+
+- 「前のIssueに依存」を選択 → 前のIssue番号を自動設定
+- 「カスタム入力」を選択 → ユーザー入力を受け付ける
+- 「なし」を選択 → 依存関係なし
 
 **入力例と処理**:
 
@@ -220,9 +490,9 @@ options: [
 
 #### ステップ 4-2: ラベルの入力
 
-AskUserQuestion ツールでラベルを質問:
+**単一Issue作成の場合**:
 
-**質問内容**:
+AskUserQuestion ツールでラベルを質問:
 
 ```
 question: "ラベルを入力してください（カンマ区切り、例: infra, cdk, security）。ラベルがない場合は空のままEnterを押してください。"
@@ -232,6 +502,26 @@ options: [
   { label: "カスタム入力", description: "ラベルをカンマ区切りで入力" }
 ]
 ```
+
+**複数Issue作成の場合**:
+
+各Issueに対して個別に質問:
+
+```
+question: "Issue #{番号} のラベルを入力してください（カンマ区切り、例: infra, cdk）。前のIssueと同じラベルを使用する場合は「前と同じ」を選択してください。"
+header: "ラベル (Issue #{番号})"
+options: [
+  { label: "なし", description: "ラベルがない場合はこちらを選択" },
+  { label: "前と同じ（{前のラベル}）", description: "前のIssueと同じラベルを使用します" }, // Issue 2以降のみ表示
+  { label: "カスタム入力", description: "ラベルをカンマ区切りで入力" }
+]
+```
+
+**処理ロジック**:
+
+- 「前と同じ」を選択 → 前のIssueのラベルをコピー
+- 「カスタム入力」を選択 → ユーザー入力を受け付ける
+- 「なし」を選択 → ラベルなし
 
 **入力例と処理**:
 
@@ -263,9 +553,20 @@ options: [
 
 ### Phase 5: Issue形式のMarkdown生成
 
+**重要**: 各Issue分割に対して個別にMarkdownを生成します。
+
+- **単一Issue作成の場合**: Plan全体の内容を1つのIssueに変換
+- **複数Issue作成の場合**: 各Issue範囲（startSection〜endSection）の内容のみを抽出して変換
+
 #### ステップ 5-1: Plan→Issue セクションマッピング
 
+**単一Issue作成の場合**:
+
 Planファイルの各セクションを抽出し、Issueフォーマットにマッピング:
+
+**複数Issue作成の場合**:
+
+各Issue分割の範囲内のセクションのみを抽出し、Issueフォーマットにマッピング:
 
 **セクション抽出の正規表現**:
 
@@ -278,6 +579,7 @@ Planファイルの各セクションを抽出し、Issueフォーマットに�
 | Planセクション         | Issueセクション                | 変換ルール                             |
 | ---------------------- | ------------------------------ | -------------------------------------- |
 | `# タイトル`           | `# Issue #XX: タイトル`        | Issue番号を付与                        |
+| （自動生成）           | `### 関連ドキュメント`         | Planファイルへのリンクを自動生成       |
 | `## Critical Files`    | `## 📂 コンテキスト (Context)` | ファイル一覧を箇条書きで転記           |
 | `## Context`           | `### 背景 / 目的`              | 最初の段落（1〜2文）を抽出             |
 | `## 概要`              | `### 背景 / 目的`              | 内容をそのまま転記                     |
@@ -325,6 +627,10 @@ Planファイルの各セクションを抽出し、Issueフォーマットに�
 
 ```markdown
 # Issue #{{issue_number}}: {{title}}
+
+### 関連ドキュメント
+
+- 📝 Plan: [{{plan_filename}}](../plan/{{plan_filename}})
 
 {{#if context}}
 
@@ -374,6 +680,7 @@ Planファイルの各セクションを抽出し、Issueフォーマットに�
 
 - `{{issue_number}}`: Phase 2で決定したIssue番号
 - `{{title}}`: Phase 3で抽出したタイトル
+- `{{plan_filename}}`: Phase 1で特定したPlanファイル名（例: `stateful-purring-pond.md`）
 - `{{context}}`: Phase 5-1で抽出したコンテキスト（Critical Files）の内容
 - `{{background}}`: Phase 5-1で抽出した背景/目的の内容
 - `{{dependencies_list}}`: Phase 4-1で入力した依存関係（例: `#14, #15`）
@@ -396,6 +703,10 @@ Planファイルの各セクションを抽出し、Issueフォーマットに�
 
 ```markdown
 # Issue #17: `/create-issue` スキル実装プラン
+
+### 関連ドキュメント
+
+- 📝 Plan: [stateful-purring-pond.md](../plan/stateful-purring-pond.md)
 
 ## 📂 コンテキスト (Context)
 
@@ -442,6 +753,8 @@ Planモードで作成した実装計画を、Issue形式（`docs/issues/{番号
 
 ### Phase 6: ファイル書き込みと成功メッセージ
 
+**重要**: 各Issue分割に対して個別にファイルを作成します。
+
 #### ステップ 6-1: ファイルパスの生成
 
 ```
@@ -459,6 +772,16 @@ file_path: docs/issues/{issue_number}-{slug}.md
 content: <Phase 5で生成したMarkdown文字列>
 ```
 
+**複数Issue作成の場合**:
+
+各Issueに対して順次ファイルを作成し、進捗を表示:
+
+```
+Issue #17 を作成中... ✓
+Issue #18 を作成中... ✓
+Issue #19 を作成中... ✓
+```
+
 **エラーハンドリング**:
 
 - 書き込み失敗の場合:
@@ -466,12 +789,12 @@ content: <Phase 5で生成したMarkdown文字列>
   ```
   === Issue Creation Error ===
 
-  Error: Failed to write issue file
+  Error: Failed to write issue file (Issue #{番号})
 
   Please check file permissions and try again.
   ```
 
-  → 処理を中止
+  → 処理を中止（既に作成されたIssueはそのまま残る）
 
 - ファイルが既に存在する場合:
   - Writeツールは自動的に上書きするため、警告メッセージのみ表示
@@ -479,7 +802,7 @@ content: <Phase 5で生成したMarkdown文字列>
 
 #### ステップ 6-3: 成功メッセージの表示
 
-**出力フォーマット**:
+**単一Issue作成の場合の出力フォーマット**:
 
 ```
 === Issue Created Successfully ===
@@ -501,12 +824,41 @@ You can now view the issue at:
   docs/issues/{{issue_number}}-{{slug}}.md
 ```
 
+**複数Issue作成の場合の出力フォーマット**:
+
+```
+=== Multiple Issues Created Successfully ===
+
+Created {{count}} issues from Plan:
+
+Issue #17: {{title1}}
+  Location: docs/issues/17-{{slug1}}.md
+  Dependencies: {{dependencies1}}
+  Labels: {{labels1}}
+
+Issue #18: {{title2}}
+  Location: docs/issues/18-{{slug2}}.md
+  Dependencies: #17
+  Labels: {{labels2}}
+
+Issue #19: {{title3}}
+  Location: docs/issues/19-{{slug3}}.md
+  Dependencies: #18
+  Labels: {{labels3}}
+
+---
+
+All issues have been created from Plan: {{plan_filename}}
+You can find them in: docs/issues/
+```
+
 **変数の展開**:
 
+- `{{count}}`: 作成されたIssue数
 - `{{dependencies_with_hash}}`: 依存関係に `#` を付けた形式（例: `#14, #15`）
 - `{{labels_joined}}`: ラベルをカンマ区切りで連結（例: `infra, cdk, security`）
 
-**出力例**:
+**出力例（単一Issue）**:
 
 ```
 === Issue Created Successfully ===
@@ -522,6 +874,34 @@ Metadata:
 
 You can now view the issue at:
   docs/issues/17-create-issue.md
+```
+
+**出力例（複数Issue）**:
+
+```
+=== Multiple Issues Created Successfully ===
+
+Created 3 issues from Plan:
+
+Issue #17: 初期構築プラン - 概要
+  Location: docs/issues/17-overview.md
+  Dependencies: なし
+  Labels: infra, planning
+
+Issue #18: Phase 1-2: インフラとバックエンド実装
+  Location: docs/issues/18-phase1-2.md
+  Dependencies: #17
+  Labels: infra, backend
+
+Issue #19: Phase 3: フロントエンド実装とテスト
+  Location: docs/issues/19-phase3.md
+  Dependencies: #18
+  Labels: frontend, testing
+
+---
+
+All issues have been created from Plan: initial-setup-plan.md
+You can find them in: docs/issues/
 ```
 
 ---
