@@ -1,19 +1,240 @@
-# E2Eテスト仕様書
+# テスト仕様書
 
 ## 1. 概要
 
-本ドキュメントは、OIDC学習サンドボックスのE2E（End-to-End）テスト仕様を定義します。
-curlコマンドを使用したHTTPレベルでの動作確認と、ブラウザを使用した手動テストの両方を含みます。
+本ドキュメントは、OIDC学習サンドボックスのテスト仕様を定義します。
+単体テストと結合テストの両方を含み、コードの品質を保証し、リファクタリングや機能追加時の安全性を高めることを目的としています。
 
-### 1.1 テスト対象
+### 1.1 テストの種類
+
+| テスト種別 | 対象                               | フレームワーク | 実行環境                |
+| ---------- | ---------------------------------- | -------------- | ----------------------- |
+| 単体テスト | ユーティリティ関数、ハンドラー、UI | Vitest         | ローカル（CI/CD）       |
+| 結合テスト | HTTPレベルでの認証フロー全体       | Playwright     | AWS環境（デプロイ済み） |
+
+---
+
+## 2. 単体テストの方針
+
+### 2.1 バックエンド単体テスト
+
+#### テスト対象
+
+| ファイル               | 説明                                    | テストファイル        |
+| ---------------------- | --------------------------------------- | --------------------- |
+| `utils/cookie.ts`      | Cookie操作ユーティリティ                | `cookie.test.ts`      |
+| `utils/pkce.ts`        | PKCE（state, nonce, code_verifier）生成 | `pkce.test.ts`        |
+| `utils/session.ts`     | DynamoDBセッション管理                  | `session.test.ts`     |
+| `utils/ssm.ts`         | SSM Parameter Store取得                 | `ssm.test.ts`         |
+| `utils/secrets.ts`     | Secrets Manager取得                     | `secrets.test.ts`     |
+| `utils/oidc-config.ts` | OIDC Discovery設定取得                  | `oidc-config.test.ts` |
+| `handlers/login.ts`    | 認可リクエストハンドラー                | `login.test.ts`       |
+| `handlers/callback.ts` | コールバックハンドラー                  | `callback.test.ts`    |
+| `handlers/account.ts`  | 口座作成ハンドラー                      | `account.test.ts`     |
+
+#### モック戦略
+
+**AWS SDK**
+
+`aws-sdk-client-mock` を使用してAWS SDKをモック化。
+
+```typescript
+import { mockClient } from 'aws-sdk-client-mock'
+import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb'
+
+const dynamoMock = mockClient(DynamoDBClient)
+
+// 正常系
+dynamoMock.on(PutItemCommand).resolves({})
+
+// 異常系
+dynamoMock.on(PutItemCommand).rejects(new Error('DynamoDB Error'))
+```
+
+**openid-client**
+
+`vi.mock()` を使用してOIDC Discoveryをモック化。
+
+```typescript
+vi.mock('openid-client', async () => {
+  const actual = await vi.importActual('openid-client')
+  return {
+    ...actual,
+    discovery: vi.fn()
+  }
+})
+```
+
+#### テスト実行
+
+```bash
+cd backend
+
+# テスト実行
+npm test
+
+# ウォッチモード
+npm run test:watch
+
+# UI付きテスト
+npm run test:ui
+
+# カバレッジレポート生成
+npm run test:coverage
+```
+
+---
+
+### 2.2 フロントエンド単体テスト
+
+#### テスト対象
+
+| ファイル                   | 説明                      | テストファイル          |
+| -------------------------- | ------------------------- | ----------------------- |
+| `utils/api.ts`             | API呼び出しユーティリティ | `api.test.ts`           |
+| `contexts/AuthContext.tsx` | 認証状態Context           | `AuthContext.test.tsx`  |
+| `pages/IndexPage.tsx`      | トップページ              | `IndexPage.test.tsx`    |
+| `pages/CallbackPage.tsx`   | 認証成功ページ            | `CallbackPage.test.tsx` |
+| `pages/ErrorPage.tsx`      | エラーページ              | `ErrorPage.test.tsx`    |
+| `App.tsx`                  | ルーティング設定          | `App.test.tsx`          |
+
+#### テストライブラリ
+
+- **React Testing Library**: コンポーネントテスト
+- **jsdom**: ブラウザ環境シミュレーション
+
+#### モック戦略
+
+**fetch API**
+
+```typescript
+const mockFetch = vi.fn()
+vi.stubGlobal('fetch', mockFetch)
+
+// 正常系
+mockFetch.mockResolvedValue({
+  ok: true,
+  json: () => Promise.resolve({ accountNumber: '1234567890' })
+})
+
+// 異常系
+mockFetch.mockRejectedValue(new Error('Network error'))
+```
+
+**ルーティング**
+
+```typescript
+import { MemoryRouter } from 'react-router-dom';
+
+render(
+  <MemoryRouter initialEntries={['/error?error=access_denied']}>
+    <ErrorPage />
+  </MemoryRouter>
+);
+```
+
+#### テスト実行
+
+```bash
+cd frontend
+
+# テスト実行
+npm test
+
+# ウォッチモード
+npm run test:watch
+
+# UI付きテスト
+npm run test:ui
+
+# カバレッジレポート生成
+npm run test:coverage
+```
+
+---
+
+### 2.3 テストの原則
+
+#### 正常系と異常系
+
+すべての関数・コンポーネントについて、正常系と異常系の両方をテストします。
+
+```typescript
+describe('functionName', () => {
+  describe('正常系', () => {
+    it('期待される動作をする', () => {
+      /* ... */
+    })
+  })
+
+  describe('異常系', () => {
+    it('エラー時は適切に処理する', () => {
+      /* ... */
+    })
+  })
+})
+```
+
+#### 異常系テストの観点
+
+- **不正な入力値**: null、undefined、空文字列、不正な型
+- **外部サービスエラー**: AWS SDK のエラー（DynamoDB、SSM、Secrets Manager）
+- **HTTPエラー**: 4xx、5xx、ネットワークエラー
+- **認証・認可エラー**: State不一致、Nonce不一致、Session未存在
+- **データフォーマットエラー**: 不正なJSON、不正なCookie
+
+#### テストの独立性
+
+- 各テストは独立して実行可能
+- テスト間で状態を共有しない
+- `beforeEach`/`afterEach` でセットアップ・クリーンアップ
+
+```typescript
+beforeEach(() => {
+  dynamoMock.reset()
+  vi.clearAllMocks()
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+```
+
+#### カバレッジ
+
+カバレッジ目標値は設定しませんが、レポートは生成可能です。
+
+```bash
+# バックエンド
+cd backend && npm run test:coverage
+
+# フロントエンド
+cd frontend && npm run test:coverage
+```
+
+レポートは各ディレクトリの `coverage/` に出力されます。
+
+---
+
+## 3. 結合テストの方針
+
+### 3.1 目的
+
+デプロイされたAWS環境上で、OIDC認証フロー全体が正しく動作することを検証します。
+
+### 3.2 テストフレームワーク
+
+- **Playwright**: HTTPレベルでの動作確認
+- **curl**: 簡易的なエンドポイント検証
+
+### 3.3 テスト環境
 
 | 項目         | 値                                                 |
 | ------------ | -------------------------------------------------- |
 | 対象システム | OIDC学習サンドボックス                             |
-| テスト種別   | E2E（手動テスト）                                  |
 | テスト環境   | AWS（CloudFront + API Gateway + Lambda + Cognito） |
 
-### 1.2 前提条件
+### 3.4 前提条件
 
 - CDKデプロイが完了していること
 - CloudFront URLが取得できていること
@@ -22,32 +243,25 @@ curlコマンドを使用したHTTPレベルでの動作確認と、ブラウザ
 
 ---
 
-## 2. curlコマンドによるHTTPレベルテスト
+## 4. 結合テストケース
 
-### 2.1 テスト環境変数の設定
+### 4.1 HTTPレベルテスト
 
-```bash
-# テスト対象のCloudFront URL（デプロイ時の出力値を設定）
-export CLOUDFRONT_URL="https://xxxxx.cloudfront.net"
-```
+#### テストケース一覧
 
----
-
-### 2.2 テストケース一覧
-
-| ID       | テストケース名                 | 確認観点                             |
-| -------- | ------------------------------ | ------------------------------------ |
-| HTTP-001 | トップページ表示               | 静的ファイルが正しく配信されるか     |
-| HTTP-002 | 認可エンドポイントリダイレクト | 認可URLが正しく生成されるか          |
-| HTTP-003 | 認証成功ページ表示             | コールバックページが配信されるか     |
-| HTTP-004 | エラーページ表示               | エラーページが配信されるか           |
-| HTTP-005 | OIDCパラメータ検証             | state/nonce/PKCEが正しく設定されるか |
+| ID       | ケース種別 | テストケース名                 | 確認観点                             |
+| -------- | ---------- | ------------------------------ | ------------------------------------ |
+| HTTP-001 | 正常系     | トップページ表示               | 静的ファイルが正しく配信されるか     |
+| HTTP-002 | 正常系     | 認可エンドポイントリダイレクト | 認可URLが正しく生成されるか          |
+| HTTP-003 | 正常系     | 認証成功ページ表示             | コールバックページが配信されるか     |
+| HTTP-004 | 正常系     | エラーページ表示               | エラーページが配信されるか           |
+| HTTP-005 | 正常系     | OIDCパラメータ検証             | state/nonce/PKCEが正しく設定されるか |
 
 ---
 
-### 2.3 テストケース詳細
+#### テストケース詳細
 
-#### HTTP-001: トップページ表示
+##### HTTP-001: トップページ表示
 
 **確認観点**
 
@@ -83,7 +297,7 @@ curl -s "${CLOUDFRONT_URL}/" | grep -q "login-button" && echo "PASS" || echo "FA
 
 ---
 
-#### HTTP-002: 認可エンドポイントリダイレクト
+##### HTTP-002: 認可エンドポイントリダイレクト
 
 **確認観点**
 
@@ -120,7 +334,7 @@ curl -s -I "${CLOUDFRONT_URL}/api/auth/login" | grep -i "^location:"
 
 ---
 
-#### HTTP-003: 認証成功ページ表示
+##### HTTP-003: 認証成功ページ表示
 
 **確認観点**
 
@@ -156,7 +370,7 @@ curl -s "${CLOUDFRONT_URL}/callback.html" | grep -q "user-email" && echo "PASS" 
 
 ---
 
-#### HTTP-004: エラーページ表示
+##### HTTP-004: エラーページ表示
 
 **確認観点**
 
@@ -190,7 +404,7 @@ curl -s "${CLOUDFRONT_URL}/error.html" | grep -q "error-message" && echo "PASS" 
 
 ---
 
-#### HTTP-005: OIDCパラメータ検証
+##### HTTP-005: OIDCパラメータ検証
 
 **確認観点**
 
@@ -232,21 +446,21 @@ echo "$LOCATION" | grep -q "code_challenge_method=S256" && echo "code_challenge_
 
 ---
 
-## 3. ブラウザによる手動テスト
+### 4.2 ブラウザテスト
 
-### 3.1 テストケース一覧
+#### テストケース一覧
 
-| ID     | テストケース名             | 確認観点                           |
-| ------ | -------------------------- | ---------------------------------- |
-| UI-001 | 正常系：新規ユーザー登録   | 新規ユーザーが登録できること       |
-| UI-002 | 正常系：認証成功画面表示   | ユーザー情報が正しく表示されること |
-| UI-003 | 異常系：ログインキャンセル | エラーメッセージが表示されること   |
+| ID     | ケース種別 | テストケース名     | 確認観点                           |
+| ------ | ---------- | ------------------ | ---------------------------------- |
+| UI-001 | 正常系     | 新規ユーザー登録   | 新規ユーザーが登録できること       |
+| UI-002 | 正常系     | 認証成功画面表示   | ユーザー情報が正しく表示されること |
+| UI-003 | 異常系     | ログインキャンセル | エラーメッセージが表示されること   |
 
 ---
 
-### 3.2 テストケース詳細
+#### テストケース詳細
 
-#### UI-001: 正常系：新規ユーザー登録
+##### UI-001: 正常系：新規ユーザー登録
 
 **前提条件**
 
@@ -271,7 +485,7 @@ echo "$LOCATION" | grep -q "code_challenge_method=S256" && echo "code_challenge_
 
 ---
 
-#### UI-002: 正常系：認証成功画面表示
+##### UI-002: 正常系：認証成功画面表示
 
 **前提条件**
 
@@ -297,7 +511,7 @@ echo "$LOCATION" | grep -q "code_challenge_method=S256" && echo "code_challenge_
 
 ---
 
-#### UI-003: 異常系：ログインキャンセル
+##### UI-003: 異常系：ログインキャンセル
 
 **前提条件**
 
@@ -321,11 +535,28 @@ echo "$LOCATION" | grep -q "code_challenge_method=S256" && echo "code_challenge_
 
 ---
 
-## 4. テスト実行スクリプト
+## 5. テスト実行方法
 
-### 4.1 一括実行スクリプト
+### 5.1 単体テスト実行
 
-以下のスクリプトでHTTPレベルのテストを一括実行できます。
+```bash
+# バックエンド
+cd backend && npm test
+
+# フロントエンド
+cd frontend && npm test
+```
+
+### 5.2 結合テスト実行（HTTPテスト）
+
+#### 環境変数設定
+
+```bash
+# テスト対象のCloudFront URL（デプロイ時の出力値を設定）
+export CLOUDFRONT_URL="https://xxxxx.cloudfront.net"
+```
+
+#### 一括実行スクリプト
 
 ```bash
 #!/bin/bash
@@ -334,7 +565,7 @@ echo "$LOCATION" | grep -q "code_challenge_method=S256" && echo "code_challenge_
 CLOUDFRONT_URL="${CLOUDFRONT_URL:-https://xxxxx.cloudfront.net}"
 
 echo "=========================================="
-echo "E2E HTTP Test - OIDC Learning Sandbox"
+echo "Integration Test - OIDC Learning Sandbox"
 echo "Target: ${CLOUDFRONT_URL}"
 echo "=========================================="
 
@@ -442,20 +673,20 @@ fi
 exit 0
 ```
 
-### 4.2 スクリプトの使用方法
+#### スクリプト使用方法
 
 ```bash
 # 環境変数を設定して実行
 export CLOUDFRONT_URL="https://xxxxx.cloudfront.net"
-chmod +x e2e-test.sh
-./e2e-test.sh
+chmod +x integration-test.sh
+./integration-test.sh
 ```
 
 ---
 
-## 5. テスト結果記録
+## 6. テスト結果記録
 
-### 5.1 テスト実行記録テンプレート
+### 6.1 テスト実行記録テンプレート
 
 | 項目               | 値         |
 | ------------------ | ---------- |
@@ -464,7 +695,7 @@ chmod +x e2e-test.sh
 | 環境URL            |            |
 | デプロイバージョン |            |
 
-### 5.2 HTTPテスト結果
+### 6.2 HTTPテスト結果
 
 | ID       | テストケース名                 | 結果        | 備考 |
 | -------- | ------------------------------ | ----------- | ---- |
@@ -474,20 +705,29 @@ chmod +x e2e-test.sh
 | HTTP-004 | エラーページ表示               | PASS / FAIL |      |
 | HTTP-005 | OIDCパラメータ検証             | PASS / FAIL |      |
 
-### 5.3 ブラウザテスト結果
+### 6.3 ブラウザテスト結果
 
-| ID     | テストケース名             | 結果        | 備考 |
-| ------ | -------------------------- | ----------- | ---- |
-| UI-001 | 正常系：新規ユーザー登録   | PASS / FAIL |      |
-| UI-002 | 正常系：認証成功画面表示   | PASS / FAIL |      |
-| UI-003 | 異常系：ログインキャンセル | PASS / FAIL |      |
+| ID     | テストケース名     | 結果        | 備考 |
+| ------ | ------------------ | ----------- | ---- |
+| UI-001 | 新規ユーザー登録   | PASS / FAIL |      |
+| UI-002 | 認証成功画面表示   | PASS / FAIL |      |
+| UI-003 | ログインキャンセル | PASS / FAIL |      |
 
 ---
 
-## 6. 既知の制限事項
+## 7. 既知の制限事項
 
 1. **ログアウト機能未実装**: 学習用途のため、ログアウト機能は実装されていません。異常系テストを行う場合は、シークレットウィンドウを使用するか、ブラウザのCookieを削除してください。
 
-2. **自動E2Eテスト未実装**: 本ドキュメントは手動テストを対象としています。Playwright/Cypress等を使用した自動E2Eテストは将来機能として検討中です。
+2. **自動結合テスト未実装**: 本ドキュメントは手動テストを対象としています。Playwright/Cypress等を使用した自動結合テストは将来機能として検討中です。
 
 3. **トークン検証の詳細テスト**: IDトークンの署名検証、有効期限検証などの詳細テストは、curlコマンドでは実施が困難です。これらはログ確認またはユニットテストで補完してください。
+
+---
+
+## 8. 参考資料
+
+- [Vitest - Getting Started](https://vitest.dev/guide/)
+- [aws-sdk-client-mock](https://github.com/m-radzikowski/aws-sdk-client-mock)
+- [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+- [Playwright Documentation](https://playwright.dev/)
