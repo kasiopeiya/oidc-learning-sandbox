@@ -88,7 +88,7 @@ export async function createAccount(): Promise<AccountResponse | ErrorResponse> 
   })
 
   // JSONレスポンスをパース
-  const data = await response.json()
+  const data = (await response.json()) as AccountResponse | ErrorResponse
 
   // エラーレスポンスの場合
   if (!response.ok) {

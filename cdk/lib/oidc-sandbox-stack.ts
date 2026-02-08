@@ -270,7 +270,7 @@ export class OidcSandboxStack extends Stack {
     // ============================================================
     // 定数定義: SecretManager のシークレット名
     // ============================================================
-    // 樹幹参照エラーを避けるため、ここで定数を定義
+    // 循環参照エラーを避けるため、ここで定数を定義
     // Cognito User Pool Client のクライアントシークレットを Secrets Manager に保存する場合の名前
     const clientIdName = 'oidc-sandbox/client-id'
     const clientSecretName = 'oidc-sandbox/client-secret'

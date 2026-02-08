@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 
 // 2. 自作モジュール
 import { useAuth } from '../contexts/AuthContext'
-import { createAccount, type AccountResponse } from '../utils/api'
+import { createAccount } from '../utils/api'
 
 /**
  * 認証成功画面（コールバック画面）コンポーネント
@@ -44,8 +44,8 @@ export function CallbackPage() {
           return
         }
 
-        // 成功時: 型アサーションで正しい型を適用
-        const accountData = result as AccountResponse
+        // 成功時: 正しい型を適用
+        const accountData = result
 
         // ユーザー情報を設定
         setUser({
@@ -70,7 +70,7 @@ export function CallbackPage() {
       }
     }
 
-    fetchAccount()
+    void fetchAccount()
   }, [setUser, setAccount, setIsLoading, setError])
 
   return (

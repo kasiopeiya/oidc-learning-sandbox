@@ -73,29 +73,168 @@ file_path: <最新ファイルのパス>
 
   → 処理を中止
 
-#### ステップ 1-4: Planファイルのdocs/planへのコピー
+#### ステップ 1-4a: タイトル抽出と検証
 
-Bash ツールでPlanファイルを `docs/plan/` にコピー:
+Planファイル内容（ステップ 1-3で読み込み済み）から先頭の見出しを抽出:
 
-```bash
-cp <最新Planファイルのパス> docs/plan/<Planファイル名>
+- 正規表現: `^# (.+)$`
+- 対象: 最初の50行
+- マッチした最初の行をタイトルとして採用
+
+**フォールバック**:
+
+- タイトルが見つからない場合 → Planファイル名（拡張子除去）を使用
+  - 例: `stateful-purring-pond.md` → `stateful-purring-pond`
+  - 警告メッセージを表示
+
+**警告メッセージ例**:
+
 ```
+Warning: Title not found in Plan file. Using filename as fallback.
+Filename: stateful-purring-pond
+```
+
+#### ステップ 1-4b: スラッグ生成
+
+タイトルから英数字のスラッグを生成（**既存Phase 3-2のアルゴリズムを再利用**）:
+
+**スラッグ生成アルゴリズム**:
+
+1. 英数字・ハイフン・アンダースコア・スペースのみ抽出
+2. 小文字化
+3. スペース → ハイフン変換
+4. 連続ハイフン統合
+5. 前後のハイフン削除
+6. 最大50文字に制限
 
 **例**:
 
-```bash
-cp ~/.claude/plans/stateful-purring-pond.md docs/plan/stateful-purring-pond.md
+- `/update-design カスタムスラッシュコマンド実装計画` → `update-design`
+- `Lambda Function URLs導入` → `lambda-function-urls`
+
+**フォールバック**:
+
+- スラッグが空の場合 → Planファイル名を使用
+  - 例: `stateful-purring-pond`
+- ファイル名も使えない場合 → `plan-{タイムスタンプ}` 形式
+  - 例: `plan-20260208-123456`
+
+#### ステップ 1-4c: 重複チェックと連番処理
+
+同名ファイルが存在する場合、連番を追加して一意性を保証:
+
+**処理ロジック**:
+
+1. Globツールで `docs/plan/*.md` の一覧を取得
+2. `{slug}.md` が存在するかチェック
+3. 存在する場合:
+   - `{slug}-2.md`, `{slug}-3.md`... と順次チェック
+   - 存在しない番号が見つかるまで繰り返す（最大100回）
+4. 存在しない場合:
+   - そのまま `{slug}.md` を使用
+
+**例**:
+
+- スラッグ: `update-design`
+- 既存ファイル: `update-design.md`
+- 結果: `update-design-2.md`
+
+**エラーハンドリング**:
+
+- 連番が100を超える場合 → タイムスタンプサフィックス追加
+  - 例: `update-design-20260208-123456.md`
+  - 警告メッセージを表示
+
+#### ステップ 1-4d: 必須項目バリデーション
+
+Planファイルの品質を確認し、不足項目を警告（処理は継続）:
+
+**必須項目**:
+
+1. タイトル（`# `で始まる見出し）
+2. Context/背景（`## Context` または `## 概要`）
+3. 実装ステップ/Phase（`## Phase` または `## 実装ステップ` または `## 実装アプローチ`）
+4. Verification/検証方法（`## Verification` または `## 検証` または `## テスト観点`）
+
+**検出ロジック**:
+
+Planファイル内容を正規表現でチェック:
+
+```
+1. タイトル: /^# .+/m
+2. Context: /^## (Context|概要)/m
+3. Phase: /^## (Phase|実装ステップ|実装アプローチ)/m
+4. Verification: /^## (Verification|検証|テスト観点)/m
 ```
 
-**目的**:
+**出力フォーマット**:
 
-- トレーサビリティ確保（IssueからPlanへの参照を可能にする）
-- Planファイルの永続化（`~/.claude/plans/`は一時的なディレクトリのため）
+全項目あり:
+
+```
+=== Plan File Validation ===
+
+Checking required sections...
+  ✓ Title found: "/update-design カスタムスラッシュコマンド実装計画"
+  ✓ Context/Background found
+  ✓ Implementation steps/Phases found
+  ✓ Verification method found
+
+Validation passed. Proceeding with file save.
+```
+
+一部欠けている場合:
+
+```
+=== Plan File Validation ===
+
+Checking required sections...
+  ✓ Title found: "Some Plan"
+  ✗ Context/Background NOT found
+  ✓ Implementation steps/Phases found
+  ✗ Verification method NOT found
+
+Warning: Some required sections are missing.
+The Plan file will still be saved, but consider adding the missing sections.
+```
+
+#### ステップ 1-4e: 意味のある名前でdocs/planへ保存
+
+元のPlanファイルを意味のあるファイル名でコピー:
+
+**コピー先**: `docs/plan/{新ファイル名}`
+
+- 新ファイル名: Phase 1-4cで決定済み（例: `update-design.md` または `update-design-2.md`）
+
+**実装**:
+
+```bash
+# docs/plan/ ディレクトリの存在確認
+mkdir -p docs/plan
+
+# ファイルコピー（元のランダム名 → 意味のある名前）
+cp ~/.claude/plans/stateful-purring-pond.md docs/plan/update-design.md
+```
+
+**成功メッセージ**:
+
+```
+Saved Plan file:
+  Original: stateful-purring-pond.md
+  New name: update-design.md
+  Location: docs/plan/update-design.md
+```
 
 **エラーハンドリング**:
 
 - `docs/plan/` ディレクトリが存在しない場合 → `mkdir -p docs/plan` で作成
 - コピー失敗の場合 → 警告のみ表示、処理は継続
+
+  ```
+  Warning: Failed to copy Plan file to docs/plan/
+  Error: [具体的なエラーメッセージ]
+  Proceeding with Issue creation using original Plan file.
+  ```
 
 ---
 
@@ -576,20 +715,20 @@ Planファイルの各セクションを抽出し、Issueフォーマットに�
 
 **マッピングテーブル**:
 
-| Planセクション         | Issueセクション                | 変換ルール                             |
-| ---------------------- | ------------------------------ | -------------------------------------- |
-| `# タイトル`           | `# Issue #XX: タイトル`        | Issue番号を付与                        |
-| （自動生成）           | `### 関連ドキュメント`         | Planファイルへのリンクを自動生成       |
-| `## Critical Files`    | `## 📂 コンテキスト (Context)` | ファイル一覧を箇条書きで転記           |
-| `## Context`           | `### 背景 / 目的`              | 最初の段落（1〜2文）を抽出             |
-| `## 概要`              | `### 背景 / 目的`              | 内容をそのまま転記                     |
-| `## 実装アプローチ`    | `### スコープ / 作業項目`      | 内容をそのまま転記                     |
-| `## 実装ステップ`      | `### スコープ / 作業項目`      | ステップを箇条書きで転記               |
-| `## Phase別処理フロー` | `### スコープ / 作業項目`      | フロー内容を転記                       |
-| （自動生成）           | `### ゴール / 完了条件`        | 空のチェックリスト3項目を生成          |
-| `## Verification`      | `### テスト観点`               | 内容をそのまま転記                     |
-| `## 検証`              | `### テスト観点`               | 内容をそのまま転記                     |
-| （Planに存在しない）   | `（必要なら）要確認事項`       | 空セクション（`- （なし）`）として生成 |
+| Planセクション         | Issueセクション                | 変換ルール                                       |
+| ---------------------- | ------------------------------ | ------------------------------------------------ |
+| `# タイトル`           | `# Issue #XX: タイトル`        | Issue番号を付与                                  |
+| （自動生成）           | `### 関連ドキュメント`         | Planファイルへのリンクを自動生成                 |
+| `## Critical Files`    | `## 📂 コンテキスト (Context)` | ファイル一覧を箇条書きで転記                     |
+| `## Context`           | `### 背景 / 目的`              | 最初の段落（1〜2文）を抽出                       |
+| `## 概要`              | `### 背景 / 目的`              | 内容をそのまま転記                               |
+| `## 実装アプローチ`    | `### スコープ / 作業項目`      | 内容をそのまま転記                               |
+| `## 実装ステップ`      | `### スコープ / 作業項目`      | ステップを箇条書きで転記                         |
+| `## Phase別処理フロー` | `### スコープ / 作業項目`      | フロー内容を転記                                 |
+| （自動抽出）           | `### ゴール / 完了条件`        | Planから具体的なタスクを抽出してチェックリスト化 |
+| `## Verification`      | `### テスト観点`               | 内容をそのまま転記                               |
+| `## 検証`              | `### テスト観点`               | 内容をそのまま転記                               |
+| （Planに存在しない）   | `（必要なら）要確認事項`       | 空セクション（`- （なし）`）として生成           |
 
 **コンテキストセクションの生成ロジック**:
 
@@ -620,6 +759,119 @@ Planファイルの各セクションを抽出し、Issueフォーマットに�
 1. `## 実装アプローチ` または `## 実装ステップ` または `## Phase別処理フロー` のいずれかを抽出
 2. 複数存在する場合は、すべて連結（セクションごとに見出しを保持）
 3. どれも存在しない場合、`（Planファイルに記載なし）` と記載
+
+**ゴール/完了条件セクションの生成ロジック**:
+
+Planファイルから具体的なタスクを抽出し、チェックリスト形式に変換します。以下の優先順位でタスクを探索します：
+
+**抽出優先順位**:
+
+1. **既存の「ゴール / 完了条件」セクション**: `## ゴール` または `## 完了条件` が存在する場合、その内容を優先
+2. **実装の優先順位セクション**: `## 実装の優先順位` や `## 実装手順` 内の `### Step X:` で始まるサブセクション
+3. **Phase セクション**: `## Phase 1:`, `## Phase 2:` などのセクション
+4. **検証方法セクション**: `## 検証方法` や `## テスト観点` 内の箇条書き
+5. **Critical Files セクション**: 新規作成ファイルと修正ファイルの一覧
+
+**抽出アルゴリズム**:
+
+```
+タスク配列 = []
+
+# 優先度1: 既存のゴール/完了条件セクション
+IF Plan に「## ゴール」または「## 完了条件」が存在
+  チェックリスト（`- [ ]` または `- [x]`）を抽出
+  タスク配列に追加
+  RETURN タスク配列
+
+# 優先度2: 実装の優先順位/手順セクション
+IF Plan に「## 実装の優先順位」または「## 実装手順」が存在
+  FOR EACH `### Step X:` サブセクション
+    サブセクションタイトルをタスクとして追加
+    例: "### Step 1: ESLint 設定とスクリプトの追加" → "ESLint 設定とスクリプトの追加"
+  IF サブセクション内に箇条書き（`- `）が存在
+    各箇条書きをサブタスクとして追加
+    ただし、説明的な文（コード例、注釈など）は除外
+
+# 優先度3: Phase セクション
+IF Plan に「## Phase」セクションが複数存在
+  FOR EACH `## Phase X:` セクション
+    セクションタイトルをタスクとして追加
+    例: "## Phase 1: ESLint 設定の追加" → "Phase 1: ESLint 設定の追加"
+
+# 優先度4: Critical Files セクション
+IF Plan に「## Critical Files」セクションが存在
+  IF 「### 新規作成」サブセクションが存在
+    タスク追加: "新規ファイルの作成（X ファイル）"
+  IF 「### 修正」サブセクションが存在
+    タスク追加: "既存ファイルの修正（Y ファイル）"
+
+# 優先度5: 検証方法セクション
+IF Plan に「## 検証方法」または「## テスト観点」が存在
+  タスク追加: "動作確認とテスト実行"
+
+# デフォルト（タスクが1つもない場合）
+IF タスク配列が空
+  タスク配列 = [
+    "実装完了",
+    "テスト完了",
+    "ドキュメント更新"
+  ]
+
+RETURN タスク配列
+```
+
+**チェックリスト形式への変換**:
+
+抽出されたタスクを以下の形式に変換:
+
+```markdown
+- [ ] タスク1
+- [ ] タスク2
+- [ ] タスク3
+```
+
+**例（Issue #17 の場合）**:
+
+Planの「## 実装の優先順位」セクションから以下を抽出:
+
+```
+### Step 1: ESLint 設定とスクリプトの追加
+1. `backend/eslint.config.mjs` を作成
+2. `backend/package.json` に依存関係とスクリプトを追加
+...
+
+### Step 2: `/ci` スキルとエージェントの実装
+1. `.claude/skills/ci/SKILL.md` を作成
+...
+
+### Step 3: 動作確認
+...
+```
+
+→ 以下のチェックリストに変換:
+
+```markdown
+- [ ] Backend の ESLint 設定ファイル（`eslint.config.mjs`）を作成し、動作確認
+- [ ] Frontend の ESLint 設定ファイル（`eslint.config.mjs`）を作成し、動作確認
+- [ ] `/ci` スキルファイル（`.claude/skills/ci/SKILL.md`）を作成
+- [ ] CI Runner エージェント（`.claude/agents/ci-runner/ci-runner.md`）を作成
+- [ ] `/ci` コマンドで全チェックが順次実行されることを確認
+- [ ] 各チェック失敗時に適切なエラーメッセージと修正提案が表示されることを確認
+- [ ] 全チェック成功時に成功レポートが表示されることを確認
+```
+
+**タスク数の目安**:
+
+- 最小: 3個（デフォルト）
+- 推奨: 5〜10個
+- 最大: 15個（多すぎる場合は要約）
+
+**注意事項**:
+
+- コード例（バッククォート3つで囲まれた部分）は除外
+- 説明的な文（「注:」「例:」「参考:」で始まる行）は除外
+- 重複するタスクは統合
+- タスク内容が長すぎる場合（100文字以上）は要約
 
 #### ステップ 5-2: Issueテンプレートの構築
 
@@ -660,9 +912,7 @@ Planファイルの各セクションを抽出し、Issueフォーマットに�
 
 ### ゴール / 完了条件（Acceptance Criteria）
 
-- [ ] 実装完了
-- [ ] テスト完了
-- [ ] ドキュメント更新
+{{tasks_checklist}}
 
 {{#if test_notes}}
 
@@ -680,12 +930,13 @@ Planファイルの各セクションを抽出し、Issueフォーマットに�
 
 - `{{issue_number}}`: Phase 2で決定したIssue番号
 - `{{title}}`: Phase 3で抽出したタイトル
-- `{{plan_filename}}`: Phase 1で特定したPlanファイル名（例: `stateful-purring-pond.md`）
+- `{{plan_filename}}`: Phase 1-4eで決定した新ファイル名（例: `update-design.md`）
 - `{{context}}`: Phase 5-1で抽出したコンテキスト（Critical Files）の内容
 - `{{background}}`: Phase 5-1で抽出した背景/目的の内容
 - `{{dependencies_list}}`: Phase 4-1で入力した依存関係（例: `#14, #15`）
 - `{{labels_list}}`: Phase 4-2で入力したラベル（例: `infra, cdk, security`）
 - `{{scope}}`: Phase 5-1で抽出したスコープ/作業項目の内容
+- `{{tasks_checklist}}`: Phase 5-1で抽出したタスクのチェックリスト（デフォルト: 実装完了、テスト完了、ドキュメント更新）
 - `{{test_notes}}`: Phase 5-1で抽出したテスト観点の内容
 
 **条件分岐**:
@@ -733,9 +984,12 @@ Planモードで作成した実装計画を、Issue形式（`docs/issues/{番号
 
 ### ゴール / 完了条件（Acceptance Criteria）
 
-- [ ] 実装完了
-- [ ] テスト完了
-- [ ] ドキュメント更新
+- [ ] `.claude/skills/create-issue/SKILL.md` を作成
+- [ ] `.claude/agents/issue-creator-agent/issue-creator-agent.md` を作成
+- [ ] 最新のPlanファイルが正しく検出されることを確認
+- [ ] Issue番号が自動採番されることを確認
+- [ ] タイトルとスラッグが正しく生成されることを確認
+- [ ] Issueファイルが正しいフォーマットで生成されることを確認
 
 ### テスト観点
 
@@ -918,15 +1172,18 @@ You can find them in: docs/issues/
 
 ## エラーハンドリング
 
-| エラーケース               | 判定方法                   | エラーメッセージ                                                                                | 対応                                       |
-| -------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Planファイルが見つからない | Glob が空結果              | `Error: No Plan files found in ~/.claude/plans/`                                                | エラーメッセージを表示して中止             |
-| Planファイルが空           | Read で空内容              | `Error: Plan file is empty`                                                                     | エラーメッセージを表示して中止             |
-| タイトルが抽出できない     | 正規表現マッチ失敗         | （警告のみ）`Warning: Title not found, using filename`                                          | Planファイル名をタイトルとして使用         |
-| スラッグが生成できない     | 英字が存在しない           | （警告のみ）`Warning: Slug generation failed, using fallback`                                   | Planファイル名または `issue-{番号}` を使用 |
-| 依存関係入力が不正         | 正規表現バリデーション失敗 | `Invalid input. Please enter comma-separated numbers (e.g., "14, 15").`                         | 再入力を促す（最大3回）                    |
-| ラベル入力が不正           | 正規表現バリデーション失敗 | `Invalid input. Please enter comma-separated labels (alphanumeric, hyphens, underscores only).` | 再入力を促す（最大3回）                    |
-| ファイル書き込み失敗       | Write ツールがエラー       | `Error: Failed to write issue file`                                                             | エラーメッセージを表示して中止             |
+| エラーケース                        | 判定方法                   | エラーメッセージ                                                                                | 対応                                           |
+| ----------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Planファイルが見つからない          | Glob が空結果              | `Error: No Plan files found in ~/.claude/plans/`                                                | エラーメッセージを表示して中止                 |
+| Planファイルが空                    | Read で空内容              | `Error: Plan file is empty`                                                                     | エラーメッセージを表示して中止                 |
+| タイトルが抽出できない (Phase 1-4a) | 正規表現マッチ失敗         | （警告のみ）`Warning: Title not found, using filename`                                          | Planファイル名をタイトルとして使用             |
+| スラッグが生成できない (Phase 1-4b) | 英字が存在しない           | （警告のみ）`Warning: Slug generation failed, using fallback`                                   | Planファイル名または `plan-{timestamp}` を使用 |
+| 重複が100回以上 (Phase 1-4c)        | 連番チェックループが100回  | （警告のみ）`Warning: Too many duplicates, using timestamp`                                     | タイムスタンプサフィックスを追加               |
+| 必須項目不足 (Phase 1-4d)           | 正規表現マッチ失敗         | （警告のみ）不足項目を✗で表示                                                                   | 警告のみ、処理継続                             |
+| Planファイルコピー失敗 (Phase 1-4e) | Bash `cp` エラー           | （警告のみ）`Warning: Failed to copy Plan file`                                                 | 警告のみ、処理継続（元ファイル参照）           |
+| 依存関係入力が不正                  | 正規表現バリデーション失敗 | `Invalid input. Please enter comma-separated numbers (e.g., "14, 15").`                         | 再入力を促す（最大3回）                        |
+| ラベル入力が不正                    | 正規表現バリデーション失敗 | `Invalid input. Please enter comma-separated labels (alphanumeric, hyphens, underscores only).` | 再入力を促す（最大3回）                        |
+| ファイル書き込み失敗                | Write ツールがエラー       | `Error: Failed to write issue file`                                                             | エラーメッセージを表示して中止                 |
 
 ---
 
@@ -949,12 +1206,45 @@ You can find them in: docs/issues/
 - セクションが存在しない場合はデフォルト値（`（Planファイルに記載なし）`）を使用
 - セクション順序が異なる場合も対応
 
-### 4. メタデータのオプション性
+### 4. タスクチェックリストの生成
+
+**重要**: Planファイルから具体的なタスクを抽出し、チェックリスト形式で表示すること
+
+**抽出ルール**:
+
+1. **優先順位に従ってタスクを探索**（Phase 5-1の「ゴール/完了条件セクションの生成ロジック」参照）:
+   - 既存の「ゴール / 完了条件」セクション
+   - 「実装の優先順位」セクション内の `### Step X:` サブセクション
+   - 「Phase」セクション
+   - 「検証方法」セクション
+   - 「Critical Files」セクション
+
+2. **抽出時の注意点**:
+   - コード例（バッククォート3つで囲まれた部分）は除外
+   - 説明的な文（「注:」「例:」「参考:」で始まる行）は除外
+   - 箇条書き（`- `）から実行可能なタスクのみを抽出
+   - 長すぎるタスク（100文字以上）は要約
+
+3. **フォーマット**:
+   - 各タスクは `- [ ] タスク内容` の形式
+   - タスク数: 推奨5〜10個、最小3個、最大15個
+   - タスクが1つも抽出できない場合はデフォルト（実装完了、テスト完了、ドキュメント更新）を使用
+
+4. **具体例**（Issue #17の場合）:
+   ```markdown
+   - [ ] Backend の ESLint 設定ファイル（`eslint.config.mjs`）を作成し、動作確認
+   - [ ] Frontend の ESLint 設定ファイル（`eslint.config.mjs`）を作成し、動作確認
+   - [ ] `/ci` スキルファイル（`.claude/skills/ci/SKILL.md`）を作成
+   - [ ] CI Runner エージェント（`.claude/agents/ci-runner/ci-runner.md`）を作成
+   - [ ] `/ci` コマンドで全チェックが順次実行されることを確認
+   ```
+
+### 5. メタデータのオプション性
 
 - 依存関係とラベルは任意（空入力を許可）
 - 空の場合は該当行を省略
 
-### 5. 出力フォーマットの一貫性
+### 6. 出力フォーマットの一貫性
 
 - 成功メッセージは他のエージェント（git-commit-agent、design-validator-agentなど）と同様の形式を採用
 - `=== ... ===` でセクションを区切る

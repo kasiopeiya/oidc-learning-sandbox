@@ -2,7 +2,7 @@
 name: unit-test-runner
 description: Run unit tests for backend and frontend, analyze failures, and provide detailed reports
 tools: Read, Edit, Bash, Grep, Glob
-model: sonnet
+model: haiku
 ---
 
 # Unit Test Runner Agent

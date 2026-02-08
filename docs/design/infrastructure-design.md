@@ -51,14 +51,14 @@
 
 主要な設計判断は ADR（Architecture Decision Records）として記録しています。詳細は各 ADR を参照してください。
 
-| #   | 項目             | 決定                       | 理由                                                                 | 詳細                                            |
-| --- | ---------------- | -------------------------- | -------------------------------------------------------------------- | ----------------------------------------------- |
-| 001 | バックエンド API | Lambda Function URLs       | シンプルさとコスト削減を優先。API Gateway の高度な機能は不要         | [ADR-001](./adr/001-lambda-function-urls.md)    |
-| 002 | スタック構成     | 単一スタック               | 学習用途で構築・削除の容易さを優先。個人利用のため誤削除リスクは許容 | [ADR-002](./adr/002-single-stack.md)            |
-| 003 | Lambda Construct | NodejsFunction             | TypeScript の自動トランスパイル、esbuild による最適化                | [ADR-003](./adr/003-nodejs-function.md)         |
-| 004 | アクセス制御     | OAC + AWS_IAM 認証         | CloudFront 経由のみアクセス可能にし、セキュリティを強化              | [ADR-004](./adr/004-oac-iam-auth.md)            |
-| 005 | コールドスタート | 対策なし                   | 学習用途で数秒の遅延は許容。コスト削減を優先                         | [ADR-005](./adr/005-no-coldstart-mitigation.md) |
-| 006 | CDK テスト       | スナップショットテストなし | 小規模プロジェクトで `cdk diff` と結合テストで十分                   | [ADR-006](./adr/006-no-snapshot-tests.md)       |
+| #   | 項目             | 決定                       | 理由                                                                 | 詳細                                             |
+| --- | ---------------- | -------------------------- | -------------------------------------------------------------------- | ------------------------------------------------ |
+| 001 | バックエンド API | Lambda Function URLs       | シンプルさとコスト削減を優先。API Gateway の高度な機能は不要         | [ADR-001](../adr/001-lambda-function-urls.md)    |
+| 002 | スタック構成     | 単一スタック               | 学習用途で構築・削除の容易さを優先。個人利用のため誤削除リスクは許容 | [ADR-002](../adr/002-single-stack.md)            |
+| 003 | Lambda Construct | NodejsFunction             | TypeScript の自動トランスパイル、esbuild による最適化                | [ADR-003](../adr/003-nodejs-function.md)         |
+| 004 | アクセス制御     | OAC + AWS_IAM 認証         | CloudFront 経由のみアクセス可能にし、セキュリティを強化              | [ADR-004](../adr/004-oac-iam-auth.md)            |
+| 005 | コールドスタート | 対策なし                   | 学習用途で数秒の遅延は許容。コスト削減を優先                         | [ADR-005](../adr/005-no-coldstart-mitigation.md) |
+| 006 | CDK テスト       | スナップショットテストなし | 小規模プロジェクトで `cdk diff` と結合テストで十分                   | [ADR-006](../adr/006-no-snapshot-tests.md)       |
 
 ---
 
