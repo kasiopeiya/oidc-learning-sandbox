@@ -184,6 +184,83 @@ Read tool を使用して対象の設計書を読み込み：
 3. それ以降の `|` で始まる行をデータ行として取得
 4. 各セルの値を `|` で分割して抽出
 
+#### ステップ 2-5: シーケンス図の検出と解析
+
+**シーケンス図の検出**:
+
+1. 設計書から ` ```mermaid` で始まるコードブロックを検出
+2. `sequenceDiagram` を含むブロックをシーケンス図として認識
+3. ` ``` ` で終わるまでの内容を抽出
+
+**抽出項目1: 参加者（Participant）**
+
+パターン: `participant XXX as YYY` または `participant XXX`
+
+抽出例（Backend）:
+
+- `Browser` (ブラウザ)
+- `L1` (認可Lambda)
+- `DDB` (DynamoDB)
+- `OP` (Cognito)
+- `L2` (コールバックLambda)
+- `L3` (口座作成Lambda)
+
+**抽出項目2: メッセージフロー（矢印）**
+
+パターン:
+
+- `XXX->>YYY: メッセージ` (同期メッセージ)
+- `XXX-->>YYY: メッセージ` (非同期/応答メッセージ)
+
+抽出例:
+
+- `Browser->>L1: GET /api/auth/login`
+- `L1->>DDB: PutItem(sessionId, state, nonce, verifier)`
+- `L2->>OP: POST /token (code, verifier, secret)`
+- `Browser->>L3: POST /api/account`
+
+**抽出項目3: HTTPエンドポイントとメソッド**
+
+メッセージフローから HTTP リクエストを抽出:
+
+パターン: `(GET|POST|PUT|DELETE) /[^ ]+`
+
+抽出例:
+
+- `GET /api/auth/login`
+- `GET /callback?code&state`
+- `POST /token`
+- `POST /api/account`
+
+**抽出項目4: DynamoDB操作**
+
+メッセージフローから DynamoDB 操作を抽出:
+
+パターン: `(PutItem|GetItem|UpdateItem|DeleteItem)\(`
+
+抽出例:
+
+- `PutItem(sessionId, state, nonce, verifier)`
+- `GetItem(sessionId)`
+- `PutItem(sessionId, accessToken, email, sub)`
+
+**抽出項目5: セキュリティ関連データ項目**
+
+Note や メッセージから OIDC 関連のデータ項目を抽出:
+
+パターン: 括弧内やカンマ区切りのパラメータ
+
+抽出例:
+
+- `sessionId`
+- `state`
+- `nonce`
+- `verifier` (codeVerifier)
+- `challenge` (codeChallenge)
+- `code` (認可コード)
+- `accessToken`
+- `idToken`
+
 ---
 
 ### Phase 3: 実装コードの探索と読み込み
