@@ -18,7 +18,7 @@ IssueファイルからAWS CDK実装を実行する専門エージェント。
 
 #### ステップ 1-1: Issue番号またはファイル名の取得
 
-AskUserQuestion ツールを使用してユーザーに入力を促す:
+タスクプロンプトの「Issue指定:」の値を確認する。値が含まれている場合はそれを使用し、空の場合のみAskUserQuestionでユーザーに確認する。
 
 ```
 question: "CDK実装を行うIssueを指定してください。Issue番号（例: 1）またはファイル名（例: 1-cdk-init.md）を入力してください。"
@@ -31,7 +31,7 @@ multiSelect: false
 
 **取得情報**:
 
-- ユーザー入力文字列（Issue番号 or ファイル名）
+- Issue番号 or ファイル名
 
 #### ステップ 1-2: Issueファイルの検出
 
@@ -431,7 +431,7 @@ options: [
 Bash ツールでCDKテストを実行:
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npm test
+cd cdk && npm test
 ```
 
 **成功判定**: 終了コード 0
@@ -491,13 +491,13 @@ multiSelect: false
 **「はい」選択時**:
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npm test -- -u
+cd cdk && npm test -- -u
 ```
 
 スナップショット更新後、再度テスト実行:
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npm test
+cd cdk && npm test
 ```
 
 **「いいえ」選択時**:
@@ -553,7 +553,7 @@ options: [
 Bash ツールでCloudFormationテンプレート合成:
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npx cdk synth
+cd cdk && npx cdk synth
 ```
 
 **成功判定**: 終了コード 0
@@ -826,63 +826,6 @@ CLAUDE.md の指示により、TypeScriptコンパイル（tsc）は実行しな
 
 基本的に単一スタック構成（`oidc-sandbox-stack.ts`）を想定。
 複数スタックの場合は設計書を確認。
-
----
-
-## テスト観点（実装後の検証用）
-
-### 1. Issue解析
-
-- [x] Issue番号でファイル検出
-- [x] ファイル名でファイル検出
-- [x] Issue内容の正しい解析（タイトル、ラベル、スコープ等）
-- [x] Planファイルリンクの検出と読み込み
-
-### 2. 設計書参照
-
-- [x] ラベルから設計書を正しく特定
-- [x] infrastructure-design.md の必要セクション読み込み
-- [x] CDKルールの読み込みと遵守
-
-### 3. CDK実装
-
-- [x] 既存コードパターンの踏襲
-- [x] Import形式の遵守（`aws_s3 as s3`）
-- [x] L2 Construct優先
-- [x] IAM Role自動生成の活用
-- [x] 循環参照の回避
-
-### 4. テスト実行
-
-- [x] npm test の正常実行
-- [x] スナップショット不一致の検出
-- [x] スナップショット更新機能
-- [x] テストエラーの解析と修正提案
-
-### 5. CDK合成
-
-- [x] cdk synth の正常実行
-- [x] 循環参照エラーの検出
-- [x] 循環参照回避方法の提案
-- [x] 合成エラーの解析と修正提案
-
-### 6. レポート生成
-
-- [x] 実装サマリーの表示
-- [x] テスト結果サマリーの表示
-- [x] Next Actions の提案
-- [x] Issue更新の提案
-
----
-
-## 使用可能なツール
-
-- **AskUserQuestion**: ユーザーとの対話
-- **Glob**: ファイル検索
-- **Read**: ファイル読み込み
-- **Write**: 新規ファイル作成
-- **Edit**: 既存ファイル編集
-- **Bash**: コマンド実行（npm test, cdk synth等）
 
 ---
 

@@ -18,15 +18,15 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
 
 1. アイデア作成：docs/ideaにやりたいことを記載
 2. Plan作成：Planモードで事前調査と仕様の相談
-3. PlanとIssue作成：/crate-issueコマンドで`docs/issues`にissueを保存、`docs/plan`へプランを保存
-4. 設計書更新：/designコマンドを実行すると以下フローを実施
+3. PlanとIssue作成：/crate-issueコマンドで`docs/issues`にissueを保存
+4. 設計書更新：/designコマンドを実行し、以下を実施
    - /update-designで設計書更新
    - /doc-revewerで設計書のレビュー
 5. 設計書のレビュー：人間が実施
-6. frontend/backend実装の場合：/devコマンドを実行すると以下フローを実施
+6. frontend/backend実装の場合：/devコマンドを実行すると以下を実施
    - /tddでアプリケーションコードをテスト駆動実装　＊CDKでは使用しない
-   - /reviewでコードレビュー
-   - /ciで静的解析・単体テスト実行
+   - /code-reviewでコードレビュー
+   - /code-ci-runnerで静的解析・単体テスト実行
    - /validate-designで設計書と実装の整合性チェック
 7. cdk実装の場合
    - /cdk-devで実装　＊CDKはテスト駆動開発できないので/tddではなくこちらを使用
@@ -87,8 +87,8 @@ cd cdk && source deploy.sh
 │   ├── ADR/                  # ADR、メンテ不要
 │   ├── design/               # 設計書（backend, frontend, infrastructureなど）要メンテ（最優先参照）
 │   ├── idea/                 # アイデアメモ、メンテ不要
-│   ├── plan/                 # 実装計画書、メンテ不要
-│   ├── issues/               # Issue管理、メンテ不要
+│   ├── plan/                 # プランファイルの一時保管場所、メンテ不要
+│   ├── issues/               # Issue管理、作業をする際はIssueを見て行う、メンテ不要
 │   ├── init/                 # 初期構築時のドキュメント、メンテ不要
 │   └── img/                  # 画像ファイル（シーケンス図など）
 │
