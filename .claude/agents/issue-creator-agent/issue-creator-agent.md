@@ -15,7 +15,9 @@ Planモードで作成した計画ファイルを、Issue形式（`docs/issues/{
 
 ### Phase 1: 最新Planファイルの特定と読み込み
 
-#### ステップ 1-1: Planファイルの検出
+#### ステップ 1-1: Planファイルの検出と読み込み
+
+**1-1-1. Planファイルの検出**
 
 Glob ツールを使用して、Planファイル一覧を取得:
 
@@ -24,12 +26,7 @@ pattern: "*.md"
 path: "~/.claude/plans/"
 ```
 
-**取得情報**:
-
-- ファイルパス一覧
-- ファイル名
-
-#### ステップ 1-2: 最新ファイルの特定
+**1-1-2. 最新ファイルの特定**
 
 Bash ツールで最新のファイルを特定:
 
@@ -39,7 +36,7 @@ ls -t ~/.claude/plans/*.md | head -1
 
 **出力**: 最新のPlanファイルの絶対パス（例: `/Users/username/.claude/plans/stateful-purring-pond.md`）
 
-#### ステップ 1-3: Planファイルの読み込み
+**1-1-3. Planファイルの読み込み**
 
 Read ツールで全文を読み込み:
 
@@ -73,9 +70,13 @@ file_path: <最新ファイルのパス>
 
   → 処理を中止
 
-#### ステップ 1-4a: タイトル抽出と検証
+#### ステップ 1-2: Planファイルの意味のある名前での保存
 
-Planファイル内容（ステップ 1-3で読み込み済み）から先頭の見出しを抽出:
+**目的**: ランダムな名前のPlanファイル（例: `stateful-purring-pond.md`）を、その内容を反映した意味のあるファイル名で `docs/plan/` に保存します。
+
+**1-2-1. タイトル抽出**
+
+Planファイル内容から先頭の見出しを抽出:
 
 - 正規表現: `^# (.+)$`
 - 対象: 最初の50行
@@ -94,9 +95,9 @@ Warning: Title not found in Plan file. Using filename as fallback.
 Filename: stateful-purring-pond
 ```
 
-#### ステップ 1-4b: スラッグ生成
+**1-2-2. スラッグ生成**
 
-タイトルから英数字のスラッグを生成（**既存Phase 3-2のアルゴリズムを再利用**）:
+タイトルから英数字のスラッグを生成:
 
 **スラッグ生成アルゴリズム**:
 
@@ -109,8 +110,11 @@ Filename: stateful-purring-pond
 
 **例**:
 
-- `/update-design カスタムスラッシュコマンド実装計画` → `update-design`
-- `Lambda Function URLs導入` → `lambda-function-urls`
+| タイトル                                            | スラッグ               |
+| --------------------------------------------------- | ---------------------- |
+| `/update-design カスタムスラッシュコマンド実装計画` | `update-design`        |
+| `Lambda Function URLs導入`                          | `lambda-function-urls` |
+| `設計書と実装の整合性検証`                          | （空→フォールバック）  |
 
 **フォールバック**:
 
@@ -119,7 +123,7 @@ Filename: stateful-purring-pond
 - ファイル名も使えない場合 → `plan-{タイムスタンプ}` 形式
   - 例: `plan-20260208-123456`
 
-#### ステップ 1-4c: 重複チェックと連番処理
+**1-2-3. 重複チェックと連番処理**
 
 同名ファイルが存在する場合、連番を追加して一意性を保証:
 
@@ -135,9 +139,10 @@ Filename: stateful-purring-pond
 
 **例**:
 
-- スラッグ: `update-design`
-- 既存ファイル: `update-design.md`
-- 結果: `update-design-2.md`
+| スラッグ        | 既存ファイル       | 結果ファイル名       |
+| --------------- | ------------------ | -------------------- |
+| `update-design` | `update-design.md` | `update-design-2.md` |
+| `lambda-urls`   | なし               | `lambda-urls.md`     |
 
 **エラーハンドリング**:
 
@@ -145,7 +150,7 @@ Filename: stateful-purring-pond
   - 例: `update-design-20260208-123456.md`
   - 警告メッセージを表示
 
-#### ステップ 1-4d: 必須項目バリデーション
+**1-2-4. 必須項目バリデーション**
 
 Planファイルの品質を確認し、不足項目を警告（処理は継続）:
 
@@ -198,13 +203,13 @@ Warning: Some required sections are missing.
 The Plan file will still be saved, but consider adding the missing sections.
 ```
 
-#### ステップ 1-4e: 意味のある名前でdocs/planへ保存
+**1-2-5. ファイル保存**
 
 元のPlanファイルを意味のあるファイル名でコピー:
 
 **コピー先**: `docs/plan/{新ファイル名}`
 
-- 新ファイル名: Phase 1-4cで決定済み（例: `update-design.md` または `update-design-2.md`）
+- 新ファイル名: ステップ 1-2-3で決定済み（例: `update-design.md` または `update-design-2.md`）
 
 **実装**:
 
@@ -219,10 +224,14 @@ cp ~/.claude/plans/stateful-purring-pond.md docs/plan/update-design.md
 **成功メッセージ**:
 
 ```
-Saved Plan file:
+=== Plan File Saved ===
+
+Saved Plan file with meaningful name:
   Original: stateful-purring-pond.md
   New name: update-design.md
   Location: docs/plan/update-design.md
+
+This Plan file will be referenced in the Issue's "関連ドキュメント" section.
 ```
 
 **エラーハンドリング**:
@@ -235,6 +244,8 @@ Saved Plan file:
   Error: [具体的なエラーメッセージ]
   Proceeding with Issue creation using original Plan file.
   ```
+
+**重要**: このステップで決定したファイル名（例: `update-design.md`）は、Phase 5でIssueの「関連ドキュメント」セクションのリンクとして使用されます。
 
 ---
 
@@ -443,19 +454,20 @@ Issue 3の番号 = 最大番号 + 3
 
 ---
 
-### Phase 3: タイトルとスラッグの生成
+### Phase 3: Issueタイトルとスラッグの生成
 
 **重要**: 各Issue分割に対して個別にタイトルとスラッグを生成します。
 
-#### ステップ 3-1: タイトルの抽出
+**注**: Phase 1-2ではPlanファイル保存用のタイトルとスラッグを生成しましたが、Phase 3ではIssueファイル名用のタイトルとスラッグを生成します。
+
+#### ステップ 3-1: Issueタイトルの決定
 
 **単一Issue作成の場合**:
 
-Planファイルから先頭の見出し（`# タイトル`）を抽出:
+Phase 1-2-1で既に抽出したタイトルを**そのまま使用**します:
 
-- 正規表現: `^# (.+)$`
-- 対象: Planファイルの最初の50行
-- マッチした最初の行をタイトルとして採用
+- タイトル抽出ロジック: `^# (.+)$` で先頭の見出しを取得（Phase 1-2-1と同じ）
+- **Phase 1-2-1で既に抽出済み**なので、再抽出は不要
 
 **例**:
 
@@ -463,7 +475,7 @@ Planファイルから先頭の見出し（`# タイトル`）を抽出:
 # `/create-issue` スキル実装プラン
 ```
 
-→ タイトル: `/create-issue` スキル実装プラン
+→ Issueタイトル: `/create-issue` スキル実装プラン
 
 **複数Issue作成の場合**:
 
@@ -511,11 +523,13 @@ Issue 3: セクション 5-6
 - 複数Issue作成で最初のセクションが取得できない場合 → `{Planタイトル} - Part {N}` を使用
   - 例: `初期構築プラン - Part 2`
 
-#### ステップ 3-2: スラッグの生成
+#### ステップ 3-2: Issueスラッグの生成
 
-タイトルから英数字のスラッグを生成:
+Issueタイトル（ステップ 3-1で決定）から英数字のスラッグを生成:
 
-**スラッグ生成アルゴリズム**:
+**注**: Phase 1-2-2のアルゴリズムと同じですが、**Issueファイル名用**のスラッグを生成します。
+
+**スラッグ生成アルゴリズム**（Phase 1-2-2と同じ）:
 
 1. **英語部分の抽出**: タイトルから英数字、ハイフン、アンダースコア、スペースのみを残す
 2. **小文字化**: すべて小文字に変換
@@ -1074,6 +1088,10 @@ Metadata:
   Labels: {{labels_joined}}
 {{/if}}
 
+Plan file saved:
+  Original: {{original_plan_filename}}
+  Location: docs/plan/{{plan_saved_filename}}
+
 You can now view the issue at:
   docs/issues/{{issue_number}}-{{slug}}.md
 ```
@@ -1102,7 +1120,10 @@ Issue #19: {{title3}}
 
 ---
 
-All issues have been created from Plan: {{plan_filename}}
+All issues have been created from Plan:
+  Original: {{original_plan_filename}}
+  Saved as: docs/plan/{{plan_saved_filename}}
+
 You can find them in: docs/issues/
 ```
 
@@ -1111,6 +1132,8 @@ You can find them in: docs/issues/
 - `{{count}}`: 作成されたIssue数
 - `{{dependencies_with_hash}}`: 依存関係に `#` を付けた形式（例: `#14, #15`）
 - `{{labels_joined}}`: ラベルをカンマ区切りで連結（例: `infra, cdk, security`）
+- `{{original_plan_filename}}`: 元のPlanファイル名（例: `stateful-purring-pond.md`）
+- `{{plan_saved_filename}}`: 保存されたPlanファイル名（例: `update-design.md`）
 
 **出力例（単一Issue）**:
 
@@ -1125,6 +1148,10 @@ Issue file created:
 Metadata:
   Dependencies: #14
   Labels: infra, cdk
+
+Plan file saved:
+  Original: stateful-purring-pond.md
+  Location: docs/plan/create-issue.md
 
 You can now view the issue at:
   docs/issues/17-create-issue.md
@@ -1154,7 +1181,10 @@ Issue #19: Phase 3: フロントエンド実装とテスト
 
 ---
 
-All issues have been created from Plan: initial-setup-plan.md
+All issues have been created from Plan:
+  Original: random-generated-name.md
+  Saved as: docs/plan/initial-setup-plan.md
+
 You can find them in: docs/issues/
 ```
 

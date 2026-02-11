@@ -11,12 +11,15 @@ Planモードで作成した計画ファイルを、Issue形式（`docs/issues/`
 
 ## 処理内容
 
-### 1. 最新Planファイルの検出とコピー
+### 1. 最新Planファイルの検出と意味のある名前での保存
 
 - `~/.claude/plans/` 配下のMarkdownファイルを検索
 - 更新日時が最新のPlanファイルを特定
 - Planファイルの内容を読み込み
-- Planファイルを `docs/plan/` にコピー（トレーサビリティ確保のため）
+- **Planファイルの内容からタイトルを抽出し、意味のあるファイル名（スラッグ）を生成**
+- **意味のあるファイル名で `docs/plan/` に保存**（トレーサビリティ確保のため）
+  - 例: `stateful-purring-pond.md` → `docs/plan/update-design.md`
+  - 重複する場合は連番を追加（例: `update-design-2.md`）
 
 ### 1.5. 複数Issue分割の確認（新機能）
 
@@ -74,7 +77,7 @@ Planファイルの各セクションを、Issueフォーマットにマッピ�
 | `## 概要`            | `### 背景 / 目的`              | そのまま転記                                     |
 | `## 実装アプローチ`  | `### スコープ / 作業項目`      | 内容を転記                                       |
 | `## 実装ステップ`    | `### スコープ / 作業項目`      | ステップを箇条書きで転記                         |
-| （自動抽出）         | `### タスク一覧`        | Planから具体的なタスクを抽出してチェックリスト化 |
+| （自動抽出）         | `### タスク一覧`               | Planから具体的なタスクを抽出してチェックリスト化 |
 | `## 検証`            | `### テスト観点`               | そのまま転記                                     |
 | （Planに存在しない） | `（必要なら）要確認事項`       | 空セクション（`- （なし）`）を生成               |
 
@@ -94,14 +97,17 @@ Planファイルの各セクションを、Issueフォーマットにマッピ�
 このコマンドを実行すると、`issue-creator-agent` サブエージェントが起動し、以下の処理を自動実行します:
 
 1. 最新のPlanファイルを検出
-2. **複数Issue分割の確認**（新機能）
+2. **Planファイルを意味のある名前で `docs/plan/` に保存**
+   - Planタイトルからスラッグを生成（例: `update-design.md`）
+   - 重複する場合は連番を追加（例: `update-design-2.md`）
+3. **複数Issue分割の確認**（新機能）
    - 1つのIssueとして作成 or 複数のIssueに分割
-3. Issue番号を自動採番（既存の最大番号 + 1、複数の場合は連番）
-4. タイトルからスラッグを生成
-5. 依存関係とラベルをユーザーに質問
-6. Issue形式のMarkdownを生成
-7. `docs/issues/{番号}-{slug}.md` に保存
-8. 成功メッセージを表示
+4. Issue番号を自動採番（既存の最大番号 + 1、複数の場合は連番）
+5. Issueタイトルからスラッグを生成
+6. 依存関係とラベルをユーザーに質問
+7. Issue形式のMarkdownを生成
+8. `docs/issues/{番号}-{slug}.md` に保存
+9. 成功メッセージを表示
 
 ### 実行パターン
 
@@ -137,12 +143,21 @@ Detected latest Plan file:
   /Users/username/.claude/plans/stateful-purring-pond.md
   Title: 設計書と実装の整合性検証機能の実装プラン
 
+=== Plan File Saved ===
+
+Saved Plan file with meaningful name:
+  Original: stateful-purring-pond.md
+  New name: design-implementation-validator.md
+  Location: docs/plan/design-implementation-validator.md
+
+---
+
 このPlanを複数のIssueに分割しますか？
   → 1つのIssueとして作成（デフォルト）
 
 Auto-assigned Issue number: #17
 
-Generated slug: design-implementation-validator
+Generated Issue slug: design-implementation-validator
 
 Output file: docs/issues/17-design-implementation-validator.md
 
@@ -158,10 +173,15 @@ Please provide metadata:
 
 ---
 
-Issue file created successfully!
+=== Issue Created Successfully ===
+
+Issue file created:
   Location: docs/issues/17-design-implementation-validator.md
   Issue Number: #17
   Title: 設計書と実装の整合性検証機能の実装プラン
+
+Plan file saved:
+  Location: docs/plan/design-implementation-validator.md
 ```
 
 #### 複数Issue作成の場合
@@ -172,6 +192,15 @@ Issue file created successfully!
 Detected latest Plan file:
   /Users/username/.claude/plans/initial-setup.md
   Title: OIDC学習サンドボックス初期構築プラン
+
+=== Plan File Saved ===
+
+Saved Plan file with meaningful name:
+  Original: initial-setup.md
+  New name: oidc-sandbox-initial-setup.md
+  Location: docs/plan/oidc-sandbox-initial-setup.md
+
+---
 
 Plan内のセクション構造:
   1. ## 概要
@@ -276,8 +305,11 @@ Issue #19: Phase 3-4: フロントエンド実装とテスト
 
 ---
 
-All issues have been created from Plan: initial-setup.md
-You can find them in: docs/issues/
+All issues have been created from Plan:
+  Original: initial-setup.md
+  Saved as: docs/plan/oidc-sandbox-initial-setup.md
+
+You can find the issues in: docs/issues/
 ```
 
 ## 使用技術
