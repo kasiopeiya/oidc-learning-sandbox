@@ -69,12 +69,36 @@ Issue 2以降の開始セクションをユーザーに順次質問し、分割�
 
 ---
 
-### Phase 2: 依存関係とラベルの入力
+### Phase 2: 依存関係の入力とラベルの自動推論
 
-AskUserQuestion で各Issueの依存関係とラベルを収集する。
+#### ステップ 2-1: 依存関係の入力
+
+AskUserQuestion で各Issueの依存関係を収集する。
 
 - 複数Issue作成時の Issue 2以降は「前のIssueに依存」を推奨選択肢として提示
 - 入力値バリデーション（不正な場合は再質問、最大3回）
+
+#### ステップ 2-2: ラベルの自動推論
+
+Planファイルの内容（タイトル・ファイルパス・セクション）を解析し、以下のルールでラベルを自動付与する。
+
+**ラベル推論ルール（複数マッチ可）:**
+
+| 条件（大文字小文字問わず）                                            | 付与するラベル |
+| --------------------------------------------------------------------- | -------------- |
+| `cdk/`, `CDK`, `Stack`, `Construct`, `cdk synth`, `cdk deploy` を含む | `cdk`          |
+| `backend/`, `Lambda`, `handler`, `APIGateway`, `DynamoDB` を含む      | `backend`      |
+| `frontend/`, `React`, `CloudFront`, `S3`, `HTML`, `CSS` を含む        | `frontend`     |
+| `Cognito`, `OIDC`, `OAuth`, `認証`, `認可`, `IdToken`, `JWT` を含む   | `auth`         |
+| `test`, `テスト`, `spec`, `Playwright`, `jest` を含む                 | `test`         |
+| `docs/`, `設計書`, `ドキュメント`, `ADR`, `README` を含む             | `docs`         |
+| `bug`, `バグ`, `不具合`, `修正` を含む                                | `bug`          |
+| `refactor`, `リファクタ`, `整理` を含む                               | `refactor`     |
+| `chore`, `依存`, `upgrade`, `package` を含む                          | `chore`        |
+
+上記いずれにも該当しない場合は `enhancement` を付与する。
+
+推論結果は Phase 3 で Issue 本文に反映し、Phase 4 でラベル作成・付与に使用する。
 
 ---
 
