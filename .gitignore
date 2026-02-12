@@ -44,3 +44,7 @@ integration-tests/playwright-report/
 
 # Claude
 docs/plan/
+
+# Pyhon
+__pycache__/
+*.pyc
