@@ -19,12 +19,12 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
 1. アイデア作成：docs/ideaにやりたいことを記載
 2. Plan作成：Planモードで事前調査と仕様の相談
 3. PlanとIssue作成：`/create-issue`でGitHub Issuesにissueを作成
-4. 設計書更新：`/design`を実行し、以下を実施
+4. 設計書更新：Issue番号を引数に`/design`を実行し、以下を実施
    - `/update-design`で設計書更新
    - `/doc-review`で設計書のレビュー
    - `/doc-review`の実行結果をもとに設計書を修正
 5. 設計書のレビュー：人間が実施
-6. frontend/backend実装の場合：`/code-dev`コマンドを実行すると以下を実施
+6. frontend/backend実装の場合：Issue番号を引数に`/code-dev`を実行、以下を実施
    - `/tdd`でアプリケーションコードをテスト駆動実装　＊CDKでは使用しない
    - `/code-review`でコードレビュー
    - `/code-review`の実行結果をもとに実装を修正
@@ -92,8 +92,6 @@ cd cdk && source deploy.sh
 │   ├── design/               # 設計書（backend, frontend, infrastructureなど）要メンテ（最優先参照）
 │   ├── idea/                 # アイデアメモ、メンテ不要
 │   ├── plan/                 # プランファイルの一時保管場所、メンテ不要
-│   ├── issues/               # 廃止：Issue管理はGitHub Issuesに移行済み（issues-archived/ を参照）
-│   ├── issues-archived/      # 旧ローカルIssueファイルのアーカイブ、メンテ不要
 │   ├── init/                 # 初期構築時のドキュメント、メンテ不要
 │   └── img/                  # 画像ファイル（シーケンス図など）
 │

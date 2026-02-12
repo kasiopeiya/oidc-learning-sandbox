@@ -22,62 +22,32 @@ model: opus
 
 ## 実行プロセス
 
-### Phase 1: ファイル検出とインタラクティブ選択
+### Phase 1: レビュー対象の決定
 
-#### ステップ 1-1: ドキュメントファイルの検出
+**禁止事項: Glob でプロジェクト全体のファイル一覧を取得してはならない。ユーザーにファイルの選択を求めてはならない。**
 
-Glob ツールを使用してドキュメントファイルを列挙：
+タスクプロンプトの引数を確認し、以下のルールのみに従って対象ファイルを決定すること:
 
-```
-pattern: "docs/**/*.md"
-```
+#### 引数が空・未指定の場合
 
-**取得情報**:
+Bash で以下の 2 コマンドを実行する:
 
-- ファイルパス一覧
-- ファイル名
-- ディレクトリ構造
-
-#### ステップ 1-2: ファイル候補の表示
-
-以下の形式でユーザーに候補を提示：
-
-```
-=== Document Review ===
-
-Found N documentation files:
-
-📁 Root Level
-  1. docs/requirements.md
-  2. docs/backend-design.md
-  3. docs/frontend-design.md
-  4. docs/infrastructure-design.md
-  5. docs/implementation-plan.md
-
-📁 Ideas
-  N-2. docs/idea/cdk-validator.md
-  N-1. docs/idea/doc-reviewer.md
-  N. docs/idea/implementation-validator.md
-
-📁 Plans
-  ...docs/plan/xxx.md
-
-Enter file number to review (1-N), or file path directly:
+```bash
+git diff --name-only --diff-filter=ACMR
+git diff --cached --name-only --diff-filter=ACMR
 ```
 
-#### ステップ 1-3: ユーザー入力の処理
+2 つの結果を結合し、重複を除去する。その後フィルタリングする:
 
-**入力形式**:
+- 残す: `.md` で終わるファイル
 
-- 番号（例: `3`）
-- ファイルパス（例: `docs/backend-design.md`）
-- 相対パス（例: `backend-design.md`）
+該当ファイルが 0 件の場合は「git diff/status に対象 Markdownファイルが見つかりませんでした」と出力して終了する。
 
-**エラーハンドリング**:
+該当ファイルが 1 件以上の場合は、ファイル一覧を出力してから各ファイルについて順番に Phase 2 以降を実行する。全ファイルのレビュー完了後、Phase 5 でレポートを出力する。
 
-- 無効な番号 → 再入力を促す（最大3回）
-- ファイルが存在しない → エラーメッセージ表示
-- 空入力 → キャンセル
+#### 引数がファイルパスの場合
+
+そのファイルパスを直接使用して Phase 2 以降を実行する。完了後、Phase 5 でレポートを出力する。
 
 ---
 

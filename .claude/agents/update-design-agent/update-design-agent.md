@@ -121,7 +121,7 @@ GitHub Issue更新:
 - Issue #{番号} のタスクチェックリストを更新しました
 
 Next Actions:
-1. /doc-reviewer で設計書の整合性をチェック（推奨）
+1. /doc-review で設計書の整合性をチェック（推奨）
 2. 人間による設計書レビュー（CLAUDE.md 開発フロー Step 5）
 3. レビュー完了後、/dev で実装開始
 ```
