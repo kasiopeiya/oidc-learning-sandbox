@@ -69,12 +69,11 @@ git diff --cached --name-only --diff-filter=ACMR
 
 **2. ディレクトリパターン**:
 
-| パス                    | 種別       |
-| ----------------------- | ---------- |
-| `docs/issues-archived/` | ISSUE_SPEC |
-| `docs/idea/`            | PROPOSAL   |
-| `docs/plan/`            | PLAN       |
-| `.claude/rules/`        | GUIDELINE  |
+| パス             | 種別      |
+| ---------------- | --------- |
+| `docs/idea/`     | PROPOSAL  |
+| `docs/plan/`     | PLAN      |
+| `.claude/rules/` | GUIDELINE |
 
 **3. セクション構造（ヘッダー分析）**:
 
