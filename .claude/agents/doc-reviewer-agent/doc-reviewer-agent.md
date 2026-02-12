@@ -72,7 +72,6 @@ git diff --cached --name-only --diff-filter=ACMR
 | パス             | 種別      |
 | ---------------- | --------- |
 | `docs/idea/`     | PROPOSAL  |
-| `docs/plan/`     | PLAN      |
 | `.claude/rules/` | GUIDELINE |
 
 **3. セクション構造（ヘッダー分析）**:

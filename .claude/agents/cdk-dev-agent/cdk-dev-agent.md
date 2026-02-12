@@ -94,10 +94,6 @@ body内 `## 📂 コンテキスト` または `### 対象ファイル` セク�
 - `cdk/lib/oidc-sandbox-stack.ts`
 - `cdk/lib/constructs/*.ts`（新規Constructの場合）
 
-**6. Planファイルへのリンク**
-
-body内 `docs/plan/([a-z0-9-]+\.md)` パターンで検出
-
 **出力例**:
 
 ```
@@ -107,7 +103,6 @@ Issue: #1 CDK初期構築
 
 ラベル: cdk, infra
 対象ファイル: cdk/lib/oidc-sandbox-stack.ts
-Planファイル: docs/plan/cdk-init.md（あれば）
 タスク一覧:
 - [ ] CDKコード実装
 - [ ] テスト実行
@@ -118,17 +113,7 @@ Planファイル: docs/plan/cdk-init.md（あれば）
 - スタック基本構成作成
 ```
 
-#### ステップ 1-5: Planファイルの読み込み（オプション）
-
-Issue内にPlanファイルへのリンクがあれば読み込み:
-
-```
-file_path: docs/plan/{plan-file-name}.md
-```
-
-詳細な実装方針、注意点、ADR参照などを取得
-
-#### ステップ 1-6: 実装仕様の整理と確認
+#### ステップ 1-5: 実装仕様の整理と確認
 
 抽出した情報をユーザーに提示し、開始確認:
 

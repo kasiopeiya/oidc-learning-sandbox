@@ -103,10 +103,6 @@ body内 `## 📂 コンテキスト` または `### 対象ファイル` セク�
 
 body内 `### 実装詳細` セクションの内容を抽出（存在する場合）
 
-**7. Planファイルへのリンク**
-
-body内 `docs/plan/([a-z0-9-]+\.md)` パターンで検出
-
 **出力**:
 
 ```typescript
@@ -121,47 +117,10 @@ body内 `docs/plan/([a-z0-9-]+\.md)` パターンで検出
     test: 'backend/src/utils/state.test.ts'
   },
   implementationDetails: "...",  // 実装詳細（あれば）
-  planFileLink: 'docs/plan/supreme-tdd-narwhal.md'  // あれば
 }
 ```
 
-#### ステップ 1-5: Planファイルの読み込み（オプション）
-
-Issueに記載されたPlanファイルのリンクを検出した場合、Planファイルを読み込み:
-
-**Planファイルパスの生成**:
-
-- Issue内のリンク: `../plan/supreme-tdd-narwhal.md`
-- 変換後の絶対パス: `docs/plan/supreme-tdd-narwhal.md`
-
-Read ツールで読み込み:
-
-```
-file_path: docs/plan/{plan_filename}
-```
-
-**抽出する情報**:
-
-- 詳細な実装方針
-- アーキテクチャ設計
-- 考慮事項
-- Critical Files
-
-**エラーハンドリング**:
-
-- Planファイルが見つからない場合:
-
-  ```
-  Warning: Planファイルが見つかりませんでした
-
-  指定されたファイル: {plan_filename}
-
-  Issueの情報のみで処理を続行します。
-  ```
-
-  → 警告のみ、処理継続
-
-#### ステップ 1-6: 対象ディレクトリの自動判定
+#### ステップ 1-5: 対象ディレクトリの自動判定
 
 ラベル情報から対象ディレクトリをマッピング:
 
@@ -175,7 +134,7 @@ file_path: docs/plan/{plan_filename}
 
 - ラベル: `backend` → `backend/`
 
-#### ステップ 1-7: テスト対象ファイルとテストファイルの特定
+#### ステップ 1-6: テスト対象ファイルとテストファイルの特定
 
 Issue内の「対象ファイル」セクションから抽出:
 
@@ -207,9 +166,9 @@ options: [
 - ラベルが `backend` の場合: `backend/src/**/*.ts`, `backend/src/**/*.test.ts`
 - ラベルが `frontend` の場合: `frontend/src/**/*.ts`, `frontend/src/**/*.test.ts`
 
-#### ステップ 1-8: 実装仕様の整理と確認
+#### ステップ 1-7: 実装仕様の整理と確認
 
-IssueとPlanから抽出した情報を整理してユーザーに確認:
+Issueから抽出した情報を整理してユーザーに確認:
 
 **表示フォーマット**:
 
@@ -226,8 +185,6 @@ Issue: #{番号} {タイトル}
 {スコープ/作業項目の要約}
 
 {実装詳細があれば表示}
-
-{Planファイルの情報があれば要約を表示}
 
 この内容でTDDサイクルを開始しますか？
 ```
@@ -259,8 +216,7 @@ options: [
   implementationFile: 'backend/src/utils/state.ts',
   testFile: 'backend/src/utils/state.test.ts',
   scope: "...",
-  implementationDetails: "...",
-  planDetails: "..."  // あれば
+  implementationDetails: "..."
 }
 ```
 
@@ -276,7 +232,6 @@ Issue内容から推奨テストケースを抽出:
 
 - スコープ/作業項目
 - 実装詳細
-- Planファイル（あれば）
 
 **推奨テストケースの提示**:
 
@@ -1076,7 +1031,6 @@ options: [
 | ----------------------------------- | -------------------------- | -------------------------------------------------- |
 | Issue が見つからない                | gh issue view がエラー     | エラーメッセージ表示して再入力（最大3回）          |
 | Issue の body が空                  | JSON body フィールドが空   | エラーメッセージ表示して中止                       |
-| Planファイルが見つからない          | Readでエラー               | 警告のみ、Issueの情報で処理継続                    |
 | テストフレームワーク未検出          | package.json解析で検出なし | インストールを提案、中止                           |
 | Red Phase: 予期しない失敗           | エラー種別で判定           | Phase 2に戻る（テスト修正）                        |
 | Red Phase: テストが成功してしまった | テスト結果で判定           | 警告表示、Phase 2に戻る                            |
