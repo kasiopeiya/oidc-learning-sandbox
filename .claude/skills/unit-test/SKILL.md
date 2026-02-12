@@ -1,6 +1,6 @@
 ---
 name: unit-test
-description: Run unit tests for backend and frontend, analyze failures, and provide detailed reports. Use when executing tests after code changes, verifying test results, or fixing failing tests.
+description: backendとfrontendの単体テストを実行し、失敗を分析して詳細レポートを提供する。コード変更後のテスト実行、テスト結果の確認、失敗テストの修正を依頼されたときに使用すること。
 context: fork
 agent: unit-test-runner
 disable-model-invocation: true

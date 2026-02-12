@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Analyze git changes and automatically create formatted commits
+description: git差分を分析し、フォーマットに従ったコミットを自動作成する。
 ---
 
 # Git Commit Helper

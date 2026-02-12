@@ -1,6 +1,6 @@
 ---
 name: cdk-ci
-description: Run static analysis, snapshot tests, and cdk synth for CDK infrastructure code. Use when running CDK CI checks for infrastructure code.
+description: CDKインフラコードの静的解析・スナップショットテスト・cdk synthを実行する。インフラコードのCDK CIチェックを依頼されたときに使用すること。
 context: fork
 agent: cdk-ci-runner
 disable-model-invocation: true

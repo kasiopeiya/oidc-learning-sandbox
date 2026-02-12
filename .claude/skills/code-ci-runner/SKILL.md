@@ -1,6 +1,6 @@
 ---
 name: code-ci-runner
-description: Run static analysis and unit tests for backend and frontend (CI pipeline simulation). Use when user requests CI checks, code quality validation before commit/PR.
+description: backendとfrontendの静的解析・単体テストを実行する（CIパイプラインシミュレーション）。CIチェックやコミット・PR前のコード品質検証を依頼されたときに使用すること。
 context: fork
 agent: code-ci-runner-agent
 disable-model-invocation: true
