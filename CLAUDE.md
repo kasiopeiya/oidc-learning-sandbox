@@ -26,7 +26,7 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
 6. frontend/backend実装の場合：/devコマンドを実行すると以下を実施
    - /tddでアプリケーションコードをテスト駆動実装　＊CDKでは使用しない
    - /code-reviewでコードレビュー
-   - /code-ci-runnerで静的解析・単体テスト実行
+   - /code-ciで静的解析・単体テスト実行
    - /validate-designで設計書と実装の整合性チェック
 7. cdk実装の場合
    - /cdk-devで実装　＊CDKはテスト駆動開発できないので/tddではなくこちらを使用
