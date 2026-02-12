@@ -1,15 +1,15 @@
 ---
 name: issue-creator-agent
-description: Convert Plan mode output to Issue format with automatic numbering and metadata collection
-tools: Read, Glob, Bash, AskUserQuestion, Write
+description: Convert Plan mode output to GitHub Issues format with metadata collection
+tools: Read, Glob, Bash, AskUserQuestion
 model: sonnet
 ---
 
 # Issue Creator Agent
 
-Planモードで作成した計画ファイルを、Issue形式（`docs/issues/{番号}-{slug}.md`）に自動変換する専門エージェント。
+Planモードで作成した計画ファイルを、GitHub Issueとして作成する専門エージェント。
 
-**重要**: `docs/plan/` へのファイル保存は行わない。Issueファイルのみ作成する。
+**重要**: ローカルの `docs/issues/` へのファイル保存は行わない。GitHub Issues のみ作成する。
 
 ---
 
@@ -69,37 +69,7 @@ Issue 2以降の開始セクションをユーザーに順次質問し、分割�
 
 ---
 
-### Phase 2: Issue番号の採番
-
-```bash
-ls docs/issues/ 2>/dev/null | grep -E '^[0-9]+' | sed 's/-.*//' | sort -n | tail -1
-```
-
-- 最大番号 + 1 を新しいIssue番号とする（ファイルが存在しない場合は 1）
-- 複数Issue作成の場合は連番で採番
-
----
-
-### Phase 3: タイトルとスラッグの生成
-
-#### タイトル抽出
-
-- 単一Issue: Planの `# タイトル` を使用
-- 複数Issue: 各Issue範囲の最初のセクションタイトルを使用
-
-#### スラッグ生成アルゴリズム
-
-1. 英数字・ハイフン・スペースのみ抽出
-2. 小文字化
-3. スペース → ハイフン
-4. 連続ハイフンを統合
-5. 最大50文字に制限
-
-**スラッグが空の場合**: `issue-{番号}` を使用
-
----
-
-### Phase 4: 依存関係とラベルの入力
+### Phase 2: 依存関係とラベルの入力
 
 AskUserQuestion で各Issueの依存関係とラベルを収集する。
 
@@ -108,7 +78,7 @@ AskUserQuestion で各Issueの依存関係とラベルを収集する。
 
 ---
 
-### Phase 5: Issue形式の生成
+### Phase 3: Issue形式の生成
 
 #### セクションマッピング
 
@@ -116,7 +86,7 @@ Planのセクションを以下のルールでIssueにマッピングする:
 
 | Planのセクション                                        | Issueのセクション        | 処理               |
 | ------------------------------------------------------- | ------------------------ | ------------------ |
-| `# タイトル`                                            | `# Issue #XX: タイトル`  | Issue番号付与      |
+| `# タイトル`                                            | `# タイトル`             | そのまま転記       |
 | `## Context` / `## 概要`                                | `## 背景 / 目的`         | 転記               |
 | `## Critical Files`                                     | `## 📂 コンテキスト`     | ファイル一覧を転記 |
 | `## 実装アプローチ` / `## 実装ステップ` / `## Phase X:` | `## スコープ / 作業項目` | 転記               |
@@ -144,10 +114,9 @@ Planのセクションを以下のルールでIssueにマッピングする:
 
 #### Issueテンプレート
 
-`assets/issue-template.md` を参照してIssueを生成する。変数は以下の通り:
+`assets/issue-template.md` を参照してIssue本文を生成する。変数は以下の通り:
 
-- `{{issue_number}}`: Phase 2で決定したIssue番号
-- `{{title}}`: Phase 3で抽出したタイトル
+- `{{title}}`: タイトル
 - `{{dependencies_list}}`: 依存関係（例: `#14, #15`）
 - `{{labels_list}}`: ラベル（例: `infra, cdk`）
 - `{{background}}`: 背景/目的の内容
@@ -160,25 +129,36 @@ Planのセクションを以下のルールでIssueにマッピングする:
 
 ---
 
-### Phase 6: ファイル書き込み
+### Phase 4: GitHub Issueの作成
 
-```
-ファイルパス: docs/issues/{issue_number}-{slug}.md
+#### ラベルの事前準備
+
+指定されたラベルが GitHub に存在しない場合は自動作成する:
+
+```bash
+gh label list --json name --jq '.[].name' | grep -q "^{label}$" || gh label create "{label}" --color "#ededed"
 ```
 
-Write ツールでIssueファイルを作成する。
+#### GitHub Issue の作成
+
+`gh issue create` コマンドで GitHub Issues を作成する:
+
+```bash
+gh issue create \
+  --title "{タイトル}" \
+  --body "{Issue本文}" \
+  --label "{ラベル1},{ラベル2}"
+```
 
 複数Issue作成の場合は各Issueを順次作成し、進捗を表示する。
 
 #### 成功メッセージ（単一Issue）
 
 ```
-=== Issue Created Successfully ===
+=== GitHub Issue Created Successfully ===
 
-Issue file created:
-  Location: docs/issues/{番号}-{slug}.md
-  Issue Number: #{番号}
-  Title: {タイトル}
+Issue URL: https://github.com/{owner}/{repo}/issues/{番号}
+Title: {タイトル}
 
 Metadata:
   Dependencies: {依存関係}
@@ -188,28 +168,26 @@ Metadata:
 #### 成功メッセージ（複数Issue）
 
 ```
-=== Multiple Issues Created Successfully ===
+=== Multiple GitHub Issues Created Successfully ===
 
 Created {N} issues:
 
-Issue #{番号1}: {タイトル1}
-  Location: docs/issues/{番号1}-{slug1}.md
+Issue: {タイトル1}
+  URL: https://github.com/{owner}/{repo}/issues/{番号1}
 
-Issue #{番号2}: {タイトル2}
-  Location: docs/issues/{番号2}-{slug2}.md
-
-You can find them in: docs/issues/
+Issue: {タイトル2}
+  URL: https://github.com/{owner}/{repo}/issues/{番号2}
 ```
 
 ---
 
 ## エラーハンドリング
 
-| エラーケース               | 対応                              |
-| -------------------------- | --------------------------------- |
-| Planファイルが見つからない | エラー表示して中止                |
-| Planファイルが空           | エラー表示して中止                |
-| タイトル抽出失敗           | Planファイル名を使用（警告のみ）  |
-| スラッグ生成失敗           | `issue-{番号}` を使用（警告のみ） |
-| 依存関係入力が不正         | 再入力を促す（最大3回）           |
-| ファイル書き込み失敗       | エラー表示して中止                |
+| エラーケース               | 対応                             |
+| -------------------------- | -------------------------------- |
+| Planファイルが見つからない | エラー表示して中止               |
+| Planファイルが空           | エラー表示して中止               |
+| タイトル抽出失敗           | Planファイル名を使用（警告のみ） |
+| 依存関係入力が不正         | 再入力を促す（最大3回）          |
+| ラベル作成失敗             | 警告のみ、処理は継続             |
+| gh コマンド失敗            | エラー表示して中止               |

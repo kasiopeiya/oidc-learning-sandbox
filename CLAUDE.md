@@ -18,7 +18,7 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
 
 1. アイデア作成：docs/ideaにやりたいことを記載
 2. Plan作成：Planモードで事前調査と仕様の相談
-3. PlanとIssue作成：/crate-issueコマンドで`docs/issues`にissueを保存
+3. PlanとIssue作成：/create-issueコマンドでGitHub Issuesにissueを作成
 4. 設計書更新：/designコマンドを実行し、以下を実施
    - /update-designで設計書更新
    - /doc-revewerで設計書のレビュー
@@ -36,8 +36,8 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
 9. 結合テスト：人間が実施、/integration-testで結合テスト実行
 
 - アプリケーションコードの実装にはTDDを採用する（CDKやそれ以外の実装は実施しない）
-- 実装作業は`docs/issues`にある指定されたissueファイルとリンクされたplanファイルに基づいて実施します
-- （厳守！）作業はissueファイル内に記載されている「タスク一覧」を１つずつ確認し、タスクが完了するごとに必ず[]内のステータスを更新しながら作業をしてください
+- 実装作業は指定されたGitHub Issue番号とリンクされたplanファイルに基づいて実施します
+- （厳守！）作業はGitHub Issueに記載されている「タスク一覧」を１つずつ確認し、タスクが完了するごとに必ず`gh issue edit`コマンドでGitHub Issueのチェックリストを更新しながら作業をしてください
 
 ## 開発ガイドライン
 
@@ -88,7 +88,8 @@ cd cdk && source deploy.sh
 │   ├── design/               # 設計書（backend, frontend, infrastructureなど）要メンテ（最優先参照）
 │   ├── idea/                 # アイデアメモ、メンテ不要
 │   ├── plan/                 # プランファイルの一時保管場所、メンテ不要
-│   ├── issues/               # Issue管理、作業をする際はIssueを見て行う、メンテ不要
+│   ├── issues/               # 廃止：Issue管理はGitHub Issuesに移行済み（issues-archived/ を参照）
+│   ├── issues-archived/      # 旧ローカルIssueファイルのアーカイブ、メンテ不要
 │   ├── init/                 # 初期構築時のドキュメント、メンテ不要
 │   └── img/                  # 画像ファイル（シーケンス図など）
 │

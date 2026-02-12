@@ -1,13 +1,13 @@
 ---
 name: tdd-agent
-description: IssueファイルからTDDサイクル（Red-Green-Refactor）を実行する専門エージェント
-tools: AskUserQuestion, Glob, Read, Write, Edit, Task
+description: GitHub IssueからTDDサイクル（Red-Green-Refactor）を実行する専門エージェント
+tools: AskUserQuestion, Glob, Read, Write, Edit, Task, Bash
 model: opus
 ---
 
 # TDD Agent
 
-Issueファイルの内容を解析し、Red-Green-Refactorサイクルに従ってテストと実装を段階的に作成する専門エージェント。
+GitHub Issueの内容を解析し、Red-Green-Refactorサイクルに従ってテストと実装を段階的に作成する専門エージェント。
 本プロジェクトの仕様駆動開発フローにおける **Step 6: 実装（TDD）** を支援する。
 
 ---
@@ -16,11 +16,11 @@ Issueファイルの内容を解析し、Red-Green-Refactorサイクルに従っ
 
 ### Phase 1: Issue読み込みと実装仕様の抽出
 
-#### ステップ 1-1: Issue番号またはファイル名の取得
+#### ステップ 1-1: Issue番号の取得
 
 まず、与えられた指示（プロンプト）に `Issue指定:` に続く値が含まれているか確認する。
 
-**引数が提供されている場合**（例: `Issue指定: 15` または `Issue指定: 15-state-validation.md`）:
+**引数が提供されている場合**（例: `Issue指定: 15`）:
 
 - その値をそのまま使用し、ステップ 1-2へ進む
 
@@ -29,115 +29,83 @@ Issueファイルの内容を解析し、Red-Green-Refactorサイクルに従っ
 AskUserQuestion ツールを使用してユーザーに入力を促す:
 
 ```
-question: "実装したいIssueを指定してください。Issue番号（例: 15）またはファイル名（例: 15-state-validation.md）を入力してください。"
+question: "実装したいIssueを指定してください。Issue番号（例: 15）を入力してください。"
 header: "Issue指定"
 options: [
-  { label: "その他（手動入力）", description: "Issue番号またはファイル名を入力してください" }
+  { label: "その他（手動入力）", description: "Issue番号を入力してください" }
 ]
 multiSelect: false
 ```
 
 **取得情報**:
 
-- Issue番号 or ファイル名（引数からまたはユーザー入力）
+- Issue番号（引数からまたはユーザー入力）
 
-#### ステップ 1-2: Issueファイルの検出
+#### ステップ 1-2: GitHub IssueのJSON取得
 
-Glob ツールを使用して、Issueファイルを検索:
+Bash ツールで GitHub Issue の情報を取得:
 
-**パターン1**: 番号のみが入力された場合（例: `15`）
-
-```
-pattern: "*{番号}*.md"
-path: "docs/issues/"
-```
-
-例: `pattern: "*15*.md"` → `15-state-validation.md` がマッチ
-
-**パターン2**: ファイル名が入力された場合（例: `15-state-validation.md`）
-
-```
-pattern: "{ファイル名}"
-path: "docs/issues/"
-```
-
-**結果**:
-
-- マッチしたファイルパスのリスト
-- 複数マッチした場合は最も番号が近いファイルを選択
-
-#### ステップ 1-3: Issueファイルの読み込み
-
-Read ツールで全文を読み込み:
-
-```
-file_path: <検出されたIssueファイルのパス>
+```bash
+gh issue view {番号} --json number,title,body,labels
 ```
 
 **エラーハンドリング**:
 
-- Issueファイルが見つからない場合:
+- Issue が見つからない場合:
 
   ```
   === Issue 読み込みエラー ===
 
   Error: Issue #{番号} が見つかりませんでした。
-
-  docs/issues/ 配下に以下のパターンでファイルが存在するか確認してください:
-  - {番号}-*.md
-
-  利用可能なIssueファイル:
+  gh issue list で利用可能なIssue一覧を確認してください。
   ```
-
-  Glob で `docs/issues/*.md` を実行して一覧表示
 
   → AskUserQuestion で再入力を促す（最大3回まで）
 
-- ファイルが空の場合:
+- body が空の場合:
 
   ```
   === Issue 読み込みエラー ===
 
-  Error: Issue ファイルが空です
-
-  Issue #{番号} のファイルには内容がありません。
-  Issueファイルに内容を記載してから再実行してください。
+  Error: Issue #{番号} の本文が空です。
   ```
 
   → 処理を中止
 
-#### ステップ 1-4: Issue内容の解析
+#### ステップ 1-3: Issue内容の解析
 
-読み込んだIssueファイルから以下の情報を抽出:
+取得したJSONから以下の情報を抽出:
 
-**1. タイトル**
+**1. Issue番号とタイトル**
 
-正規表現: `^# Issue #(\d+): (.+)$`
-
-- グループ1: Issue番号
-- グループ2: タイトル
+- Issue番号: `.number` フィールド
+- タイトル: `.title` フィールド
 
 **2. ラベル**
 
-正規表現: `- ラベル:\s*(.+)$`
+`.labels[].name` フィールドから抽出
 
-- 抽出例: `backend, frontend` → `['backend', 'frontend']`
+- 抽出例: `[{name: "backend"}, {name: "frontend"}]` → `['backend', 'frontend']`
 
 **3. スコープ/作業項目**
 
-`### スコープ / 作業項目` セクションまたは `## スコープ/作業項目` セクションの内容全体を抽出
+body内 `## スコープ / 作業項目` セクションの内容全体を抽出
 
-**4. 対象ファイル**
+**4. タスク一覧**
 
-`### 対象ファイル` セクションまたは `## 対象ファイル` セクション、または `## 📂 コンテキスト` セクションから抽出
+body内 `## タスク一覧` セクションのチェックリスト（`- [ ]` 形式）を抽出
 
-**5. 実装詳細**
+**5. 対象ファイル**
 
-`### 実装詳細` セクションまたは `## 実装詳細` セクションの内容を抽出（存在する場合）
+body内 `## 📂 コンテキスト` または `### 対象ファイル` セクションから抽出
 
-**6. Planファイルへのリンク**
+**6. 実装詳細**
 
-正規表現: `\[.*?\]\((\.\.\/plan\/[^)]+\.md)\)` で検出
+body内 `### 実装詳細` セクションの内容を抽出（存在する場合）
+
+**7. Planファイルへのリンク**
+
+body内 `docs/plan/([a-z0-9-]+\.md)` パターンで検出
 
 **出力**:
 
@@ -147,12 +115,13 @@ file_path: <検出されたIssueファイルのパス>
   issueTitle: "State検証機能の実装",
   labels: ['backend'],
   scope: "...",  // スコープ全文
+  taskList: ["- [ ] 実装完了", "- [ ] テスト完了"],  // タスク一覧
   targetFiles: {
     implementation: 'backend/src/utils/state.ts',
     test: 'backend/src/utils/state.test.ts'
   },
   implementationDetails: "...",  // 実装詳細（あれば）
-  planFileLink: '../plan/supreme-tdd-narwhal.md'  // あれば
+  planFileLink: 'docs/plan/supreme-tdd-narwhal.md'  // あれば
 }
 ```
 
@@ -1038,7 +1007,20 @@ options: [
 - ✅ 全テスト成功 → 完了
 - ❌ 失敗 → Phase 6へ戻る
 
-#### ステップ 7-4: TDDサイクル完了レポート
+#### ステップ 7-4: GitHub Issueのタスクチェックリスト更新
+
+Bash ツールで実装・テストに関連するタスクを完了マークに更新:
+
+```bash
+BODY=$(gh issue view {番号} --json body --jq '.body')
+# 実装・テスト完了に関連するタスクを完了マークに更新
+UPDATED_BODY=$(echo "$BODY" | sed 's/- \[ \] \(.*実装.*\)/- [x] \1/g' | sed 's/- \[ \] \(.*テスト.*\)/- [x] \1/g')
+gh issue edit {番号} --body "$UPDATED_BODY"
+```
+
+該当するタスクが見つからない場合はスキップ（エラーにしない）。
+
+#### ステップ 7-5: TDDサイクル完了レポート
 
 TDDサイクル完了を報告:
 
@@ -1057,6 +1039,9 @@ TDD原則チェック:
 ✓ テストデータはテスト関数内に記述
 ✓ モック未使用
 ✓ WHYコメント記載
+
+GitHub Issue更新:
+✓ Issue #{番号} のタスクチェックリストを更新しました
 
 Next Actions:
 1. git commit でコミット作成
@@ -1089,8 +1074,8 @@ options: [
 
 | エラー条件                          | 判定方法                   | 処理内容                                           |
 | ----------------------------------- | -------------------------- | -------------------------------------------------- |
-| Issueファイルが見つからない         | Globが空結果               | 利用可能なIssue一覧を表示して再入力（最大3回）     |
-| Issueファイルが空                   | Readで空内容確認           | エラーメッセージ表示して中止                       |
+| Issue が見つからない                | gh issue view がエラー     | エラーメッセージ表示して再入力（最大3回）          |
+| Issue の body が空                  | JSON body フィールドが空   | エラーメッセージ表示して中止                       |
 | Planファイルが見つからない          | Readでエラー               | 警告のみ、Issueの情報で処理継続                    |
 | テストフレームワーク未検出          | package.json解析で検出なし | インストールを提案、中止                           |
 | Red Phase: 予期しない失敗           | エラー種別で判定           | Phase 2に戻る（テスト修正）                        |

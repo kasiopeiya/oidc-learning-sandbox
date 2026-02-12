@@ -32,7 +32,7 @@ CDK インフラストラクチャコードの静的解析、Snapshotテスト�
 ### Phase 1: 環境チェック
 
 ```bash
-ls -d /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk/node_modules
+ls -d cdk/node_modules
 ```
 
 失敗時 → `{PHASE_NAME}`: `環境エラー`、`{FIX_SUGGESTIONS}`: `cd cdk && npm install` を案内して終了。
@@ -40,7 +40,7 @@ ls -d /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk/node_modules
 ### Phase 2: Prettier チェック
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox && npm run format:check
+npm run format:check
 ```
 
 失敗時 → `{PHASE_NAME}`: `Prettier Check`、違反ファイル一覧と `npm run format` の実行を案内して終了。
@@ -48,7 +48,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox && npm run format:check
 ### Phase 3: ESLint チェック（CDK）
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npm run lint
+cd cdk && npm run lint
 ```
 
 失敗時 → `{PHASE_NAME}`: `ESLint (CDK)`、エラー箇所（ファイル名:行番号、ルール名）と `npm run lint:fix` を案内して終了。
@@ -56,7 +56,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npm run lint
 ### Phase 4: TypeScript ビルド（CDK）
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npm run build
+cd cdk && npm run build
 ```
 
 失敗時 → `{PHASE_NAME}`: `TypeScript Build (CDK)`、エラー箇所（ファイル名:行番号、エラーコード）を案内して終了。
@@ -64,7 +64,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npm run build
 ### Phase 5: Snapshot テスト実行（CDK）
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npm test
+cd cdk && npm test
 ```
 
 失敗時 → `{PHASE_NAME}`: `Snapshot Tests (CDK)`、失敗テスト名と以下の修正方法を案内して終了:
@@ -77,7 +77,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npm test
 ### Phase 6: cdk synth 実行
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/cdk && npx cdk synth
+cd cdk && npx cdk synth
 ```
 
 失敗時 → `{PHASE_NAME}`: `cdk synth`、エラーメッセージと修正方法（依存関係確認、import 文確認など）を案内して終了。

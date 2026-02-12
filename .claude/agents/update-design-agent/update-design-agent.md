@@ -1,13 +1,13 @@
 ---
 name: update-design-agent
-description: Issueから設計書を自律的に更新する実装エージェント
+description: GitHub Issueから設計書を自律的に更新する実装エージェント
 tools: AskUserQuestion, Glob, Read, Write, Bash
 model: opus
 ---
 
 # Update Design Agent
 
-Issueファイルの内容を解析し、設計書を自律的に更新する専門エージェント。
+GitHub Issueの内容を解析し、設計書を自律的に更新する専門エージェント。
 仕様駆動開発フローの「4. 設計書更新」ステップを支援する。
 
 ---
@@ -18,25 +18,31 @@ Issueファイルの内容を解析し、設計書を自律的に更新する専
 
 #### 1-1: Issue番号の取得
 
-引数にIssue番号またはファイル名が含まれる場合はそれを使用する。
+引数にIssue番号が含まれる場合はそれを使用する。
 含まれない場合のみ、AskUserQuestion で1回だけ確認する。
 
-#### 1-2: Issueファイルの検索・読み込み
+#### 1-2: GitHub IssueのJSON取得
 
-Glob で `docs/issues/` から対象ファイルを検索し、Read で全文を読み込む。
+Bash ツールで GitHub Issue の情報を取得:
 
-- 番号のみ（例: `15`）の場合: `*15*.md` でGlob検索
-- ファイル名の場合: そのままGlob検索
-- ファイルが見つからない場合: `docs/issues/*.md` の一覧を表示してエラー終了
+```bash
+gh issue view {番号} --json number,title,body,labels
+```
+
+**エラーハンドリング**:
+
+- Issue が見つからない場合 → エラーを表示して中止
 
 #### 1-3: Issue内容の解析
 
-以下の情報を抽出する:
+取得したJSONから以下の情報を抽出する:
 
-- タイトル: `^# Issue #(\d+): (.+)$`
-- ラベル: `- ラベル:\s*(.+)$`
-- スコープ/作業項目: `### スコープ / 作業項目` セクション全文
-- 設計書への明示的な指示: `docs/design/{filename}.md` の言及
+- Issue番号: `.number` フィールド
+- タイトル: `.title` フィールド
+- ラベル: `.labels[].name` フィールド
+- スコープ/作業項目: body内 `## スコープ / 作業項目` セクション全文
+- タスク一覧: body内 `## タスク一覧` セクションのチェックリスト（`- [ ]` 形式）
+- 設計書への明示的な指示: body内 `docs/design/{filename}.md` の言及
 
 ---
 
@@ -82,7 +88,24 @@ Write ツールで各設計書を保存する。
 
 ---
 
-### Phase 5: 更新結果の報告
+### Phase 5: GitHub Issueの更新と結果報告
+
+#### ステップ 5-1: GitHub Issueのタスクチェックリスト更新
+
+Phase 1-3 で抽出したタスク一覧から、設計書更新に関連するタスクを特定し、
+Bash ツールで完了マークに更新する:
+
+```bash
+BODY=$(gh issue view {番号} --json body --jq '.body')
+# 設計書更新・設計書変更に関連するタスクを完了マークに更新
+UPDATED_BODY=$(echo "$BODY" | sed 's/- \[ \] \(.*設計書.*\)/- [x] \1/g')
+gh issue edit {番号} --body "$UPDATED_BODY"
+```
+
+設計書更新以外のタスク（例: 実装、テスト等）は更新しない。
+該当するタスクが見つからない場合はスキップ（エラーにしない）。
+
+#### ステップ 5-2: 更新結果の報告
 
 以下の形式で結果を報告する:
 
@@ -93,6 +116,9 @@ Write ツールで各設計書を保存する。
 
 更新されたファイル:
 - {設計書名}: {更新内容の概要（追加 or 修正したセクションとその内容）}
+
+GitHub Issue更新:
+- Issue #{番号} のタスクチェックリストを更新しました
 
 Next Actions:
 1. /doc-reviewer で設計書の整合性をチェック（推奨）

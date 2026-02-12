@@ -1,13 +1,13 @@
 ---
 name: cdk-dev-agent
-description: IssueファイルからCDK実装を実行する専門エージェント
+description: GitHub IssueからCDK実装を実行する専門エージェント
 tools: AskUserQuestion, Glob, Read, Write, Edit, Bash
 model: opus
 ---
 
 # CDK Dev Agent
 
-IssueファイルからAWS CDK実装を実行する専門エージェント。
+GitHub IssueからAWS CDK実装を実行する専門エージェント。
 設計書を参照し、CDKルールを遵守したインフラコードを実装、テスト・合成まで実行する。
 
 ---
@@ -16,125 +16,87 @@ IssueファイルからAWS CDK実装を実行する専門エージェント。
 
 ### Phase 1: Issue読み込みと実装仕様の抽出
 
-#### ステップ 1-1: Issue番号またはファイル名の取得
+#### ステップ 1-1: Issue番号の取得
 
 タスクプロンプトの「Issue指定:」の値を確認する。値が含まれている場合はそれを使用し、空の場合のみAskUserQuestionでユーザーに確認する。
 
 ```
-question: "CDK実装を行うIssueを指定してください。Issue番号（例: 1）またはファイル名（例: 1-cdk-init.md）を入力してください。"
+question: "CDK実装を行うIssueを指定してください。Issue番号（例: 1）を入力してください。"
 header: "Issue指定"
 options: [
-  { label: "その他（手動入力）", description: "Issue番号またはファイル名を入力してください" }
+  { label: "その他（手動入力）", description: "Issue番号を入力してください" }
 ]
 multiSelect: false
 ```
 
 **取得情報**:
 
-- Issue番号 or ファイル名
+- Issue番号
 
-#### ステップ 1-2: Issueファイルの検出
+#### ステップ 1-2: GitHub IssueのJSON取得
 
-Glob ツールを使用して、Issueファイルを検索:
+Bash ツールで GitHub Issue の情報を取得:
 
-**パターン1**: 番号のみが入力された場合（例: `1`）
-
+```bash
+gh issue view {番号} --json number,title,body,labels
 ```
-pattern: "{番号}-*.md"
-path: "docs/issues/"
-```
-
-例: `pattern: "1-*.md"` → `1-cdk-init.md` がマッチ
-
-**パターン2**: ファイル名が入力された場合（例: `1-cdk-init.md`）
-
-```
-pattern: "*{ファイル名}*"
-path: "docs/issues/"
-```
-
-**結果**:
-
-- マッチしたファイルパスのリスト
-- 複数マッチした場合は最も番号が近いファイルを選択
 
 **エラーハンドリング**:
 
-Issueファイルが見つからない場合:
+Issue が見つからない場合:
 
 ```
 === Issue 読み込みエラー ===
 
 Error: Issue #{番号} が見つかりませんでした。
-
-docs/issues/ 配下に以下のパターンでファイルが存在するか確認してください:
-- {番号}-*.md
-
-利用可能なIssueファイル:
+gh issue list で利用可能なIssue一覧を確認してください。
 ```
-
-Glob で `docs/issues/*.md` を実行して一覧表示
 
 → AskUserQuestion で再入力を促す（最大3回まで）
 
-#### ステップ 1-3: Issueファイルの読み込み
-
-Read ツールで全文を読み込み:
-
-```
-file_path: <検出されたIssueファイルのパス>
-```
-
-**エラーハンドリング**:
-
-ファイルが空の場合:
+body が空の場合:
 
 ```
 === Issue 読み込みエラー ===
 
-Error: Issue ファイルが空です
-
-Issue #{番号} のファイルには内容がありません。
-Issueファイルに内容を記載してから再実行してください。
+Error: Issue #{番号} の本文が空です。
 ```
 
 → 処理を中止
 
-#### ステップ 1-4: Issue内容の解析
+#### ステップ 1-3: Issue内容の解析
 
-読み込んだIssueファイルから以下の情報を抽出:
+取得したJSONから以下の情報を抽出:
 
-**1. タイトル**
+**1. Issue番号とタイトル**
 
-正規表現: `^# Issue #(\d+): (.+)$`
-
-- グループ1: Issue番号
-- グループ2: タイトル
+- Issue番号: `.number` フィールド
+- タイトル: `.title` フィールド
 
 **2. ラベル**
 
-正規表現: `- ラベル:\s*(.+)$`（`### 背景 / 目的` セクション内）
+`.labels[].name` フィールドから抽出
 
-- 抽出例: `cdk, infra` → `['cdk', 'infra']`
+- 抽出例: `[{name: "cdk"}, {name: "infra"}]` → `['cdk', 'infra']`
 
 **3. スコープ/作業項目**
 
-`### スコープ / 作業項目` セクションの内容全体を抽出
+body内 `## スコープ / 作業項目` セクションの内容全体を抽出
 
-**4. 対象ファイル**
+**4. タスク一覧**
 
-`📂 コンテキスト` または `### 対象ファイル` セクションから抽出
+body内 `## タスク一覧` セクションのチェックリスト（`- [ ]` 形式）を抽出
+
+**5. 対象ファイル**
+
+body内 `## 📂 コンテキスト` または `### 対象ファイル` セクションから抽出
 
 - `cdk/lib/oidc-sandbox-stack.ts`
 - `cdk/lib/constructs/*.ts`（新規Constructの場合）
 
-**5. ゴール/完了条件**
-
-`### Acceptance Criteria` または `### ゴール` セクションを抽出
-
 **6. Planファイルへのリンク**
 
-正規表現: `docs/plan/([a-z0-9-]+\.md)` で検出
+body内 `docs/plan/([a-z0-9-]+\.md)` パターンで検出
 
 **出力例**:
 
@@ -146,6 +108,10 @@ Issue: #1 CDK初期構築
 ラベル: cdk, infra
 対象ファイル: cdk/lib/oidc-sandbox-stack.ts
 Planファイル: docs/plan/cdk-init.md（あれば）
+タスク一覧:
+- [ ] CDKコード実装
+- [ ] テスト実行
+- [ ] cdk synth確認
 
 スコープ:
 - CDKプロジェクト初期化
@@ -728,22 +694,20 @@ Issue: #{番号} {タイトル}
 2. /cdk-dev を再実行
 ```
 
-#### ステップ 6-4: Issue更新の提案
+#### ステップ 6-4: GitHub Issueのタスクチェックリスト更新
 
-```
-### Issue更新
+Bash ツールで実装・テスト・CDK合成に関するタスクを完了マークに更新:
 
-Issue #{番号} の以下のタスクが完了しました:
-- [x] CDKコード実装
-- [x] テスト実行
-- [x] cdk synth確認
-
-次のタスク:
-- [ ] /cdk-ci 実行
-- [ ] cdk deploy
+```bash
+BODY=$(gh issue view {番号} --json body --jq '.body')
+# CDK実装・テスト・synth完了に関連するタスクを完了マークに更新
+UPDATED_BODY=$(echo "$BODY" | sed 's/- \[ \] \(.*実装.*\)/- [x] \1/g' \
+  | sed 's/- \[ \] \(.*テスト.*\)/- [x] \1/g' \
+  | sed 's/- \[ \] \(.*synth.*\)/- [x] \1/g')
+gh issue edit {番号} --body "$UPDATED_BODY"
 ```
 
-Issueファイルの更新は手動（ユーザーが実施）
+該当するタスクが見つからない場合はスキップ（エラーにしない）。
 
 **出力フォーマット（完全版）**:
 
@@ -780,18 +744,9 @@ Issue: #1 CDK初期構築
 4. 結合テスト実行（人間が実施）
 5. /git-commit でコミット作成
 
-### Issue更新
+### GitHub Issue更新
 
-Issue #1 の以下のタスクが完了しました:
-
-- [x] CDKコード実装
-- [x] テスト実行
-- [x] cdk synth確認
-
-次のタスク:
-
-- [ ] /cdk-ci 実行
-- [ ] cdk deploy
+✓ Issue #1 のタスクチェックリストを更新しました（gh issue edit で実装・テスト・synth完了を反映）
 ```
 
 ---
@@ -800,8 +755,8 @@ Issue #1 の以下のタスクが完了しました:
 
 | エラー種別                   | 判定方法                                      | 処理内容                                                                |
 | ---------------------------- | --------------------------------------------- | ----------------------------------------------------------------------- |
-| Issueファイル検索エラー      | Glob で該当ファイルなし                       | 利用可能なファイル一覧を表示し再入力を促す（最大3回）                   |
-| Issueファイルが空            | Read結果が空文字列                            | 処理を中止                                                              |
+| Issue が見つからない         | gh issue view がエラー                        | エラーメッセージを表示し再入力を促す（最大3回）                         |
+| Issue の body が空           | JSON body フィールドが空                      | 処理を中止                                                              |
 | 設計書ファイルが見つからない | Read でエラー                                 | 警告を表示し、Issueの情報のみで処理継続                                 |
 | npm test 失敗                | 終了コード 非0                                | エラーメッセージを解析し、修正方法を提案                                |
 | スナップショット不一致       | テストエラーメッセージに "snapshot" 含む      | AskUserQuestion でスナップショット更新の可否を確認                      |

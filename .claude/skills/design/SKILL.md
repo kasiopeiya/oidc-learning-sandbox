@@ -1,6 +1,6 @@
 ---
 name: design
-description: 統合設計ワークフロー。Issue（docs/issues/）から設計書（docs/design/）を更新し、自動レビューまで実行する。仕様駆動開発のStep 4で使用。「設計書を更新して」などの明示的な指示で起動すること。
+description: 統合設計ワークフロー。GitHub IssueをもとにIssueを読み込み設計書（docs/design/）を更新し、自動レビューまで実行する。仕様駆動開発のStep 4で使用。「設計書を更新して」などの明示的な指示で起動すること。
 argument-hint: '[issue番号]'
 disable-model-invocation: true
 ---

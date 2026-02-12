@@ -54,11 +54,6 @@ Found N documentation files:
   4. docs/infrastructure-design.md
   5. docs/implementation-plan.md
 
-📁 Issues
-  6. docs/issues/1-cdk-init.md
-  7. docs/issues/2-cognito.md
-  ...
-
 📁 Ideas
   N-2. docs/idea/cdk-validator.md
   N-1. docs/idea/doc-reviewer.md
@@ -104,12 +99,12 @@ Enter file number to review (1-N), or file path directly:
 
 **2. ディレクトリパターン**:
 
-| パス             | 種別       |
-| ---------------- | ---------- |
-| `docs/issues/`   | ISSUE_SPEC |
-| `docs/idea/`     | PROPOSAL   |
-| `docs/plan/`     | PLAN       |
-| `.claude/rules/` | GUIDELINE  |
+| パス                    | 種別       |
+| ----------------------- | ---------- |
+| `docs/issues-archived/` | ISSUE_SPEC |
+| `docs/idea/`            | PROPOSAL   |
+| `docs/plan/`            | PLAN       |
+| `.claude/rules/`        | GUIDELINE  |
 
 **3. セクション構造（ヘッダー分析）**:
 

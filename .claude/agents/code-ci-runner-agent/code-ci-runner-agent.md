@@ -20,14 +20,14 @@ Backend と Frontend の静的解析と単体テストを実行し、詳細に�
 以下を確認し、エラーがある場合はテンプレートの「環境エラー」フォーマットで出力して処理を中止:
 
 ```bash
-ls -d /Users/yutohasegawa/dev/oidc-learning-sandbox/backend/node_modules
-ls -d /Users/yutohasegawa/dev/oidc-learning-sandbox/frontend/node_modules
+ls -d backend/node_modules
+ls -d frontend/node_modules
 ```
 
 ### Phase 2: Prettier チェック
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox && npm run format:check
+npm run format:check
 ```
 
 **成功判定**: 終了コード 0
@@ -36,7 +36,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox && npm run format:check
 ### Phase 3: ESLint チェック（Backend）
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/backend && npm run lint
+cd backend && npm run lint
 ```
 
 **成功判定**: 終了コード 0
@@ -45,7 +45,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox/backend && npm run lint
 ### Phase 4: ESLint チェック（Frontend）
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/frontend && npm run lint
+cd frontend && npm run lint
 ```
 
 **成功判定**: 終了コード 0
@@ -54,7 +54,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox/frontend && npm run lint
 ### Phase 5: TypeScript 型チェック（Backend）
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/backend && npm run type-check
+cd backend && npm run type-check
 ```
 
 **成功判定**: 終了コード 0
@@ -63,7 +63,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox/backend && npm run type-check
 ### Phase 6: TypeScript 型チェック（Frontend）
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/frontend && npm run type-check
+cd frontend && npm run type-check
 ```
 
 **成功判定**: 終了コード 0
@@ -72,7 +72,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox/frontend && npm run type-check
 ### Phase 7: 単体テスト実行（Backend）
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/backend && npm test
+cd backend && npm test
 ```
 
 **成功判定**: 終了コード 0
@@ -81,7 +81,7 @@ cd /Users/yutohasegawa/dev/oidc-learning-sandbox/backend && npm test
 ### Phase 8: 単体テスト実行（Frontend）
 
 ```bash
-cd /Users/yutohasegawa/dev/oidc-learning-sandbox/frontend && npm test
+cd frontend && npm test
 ```
 
 **成功判定**: 終了コード 0
