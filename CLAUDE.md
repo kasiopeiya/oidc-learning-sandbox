@@ -18,20 +18,24 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
 
 1. アイデア作成：docs/ideaにやりたいことを記載
 2. Plan作成：Planモードで事前調査と仕様の相談
-3. PlanとIssue作成：/create-issueコマンドでGitHub Issuesにissueを作成
-4. 設計書更新：/designコマンドを実行し、以下を実施
-   - /update-designで設計書更新
-   - /doc-revewerで設計書のレビュー
+3. PlanとIssue作成：`/create-issue`でGitHub Issuesにissueを作成
+4. 設計書更新：`/design`を実行し、以下を実施
+   - `/update-design`で設計書更新
+   - `/doc-review`で設計書のレビュー
+   - `/doc-review`の実行結果をもとに設計書を修正
 5. 設計書のレビュー：人間が実施
-6. frontend/backend実装の場合：/devコマンドを実行すると以下を実施
-   - /tddでアプリケーションコードをテスト駆動実装　＊CDKでは使用しない
-   - /code-reviewでコードレビュー
-   - /code-ciで静的解析・単体テスト実行
-   - /validate-designで設計書と実装の整合性チェック
+6. frontend/backend実装の場合：`/code-dev`コマンドを実行すると以下を実施
+   - `/tdd`でアプリケーションコードをテスト駆動実装　＊CDKでは使用しない
+   - `/code-review`でコードレビュー
+   - `/code-review`の実行結果をもとに実装を修正
+   - `/code-ci`で静的解析・単体テスト実行
+   - `/code-ci`の実行結果をもとに実装を修正
+   - `/validate-design`で設計書と実装の整合性チェック
 7. cdk実装の場合
-   - /cdk-devで実装　＊CDKはテスト駆動開発できないので/tddではなくこちらを使用
-   - /cdk-reviewでコードレビュー
-   - /cdk-ciで静的解析・snapshotテスト・cdk synth
+   - `/cdk-dev`で実装　＊CDKはテスト駆動開発できないので/tddではなくこちらを使用
+   - `/cdk-review`でコードレビュー
+   - `/cdk-review`の実行結果を元に実装修正
+   - `/cdk-ci`で静的解析・snapshotテスト・cdk synth
 8. インフラデプロイ：人間が実施、cdk dpeloy
 9. 結合テスト：人間が実施、/integration-testで結合テスト実行
 
