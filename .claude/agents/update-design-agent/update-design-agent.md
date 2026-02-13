@@ -1,7 +1,7 @@
 ---
 name: update-design-agent
 description: GitHub Issueから設計書を自律的に更新する実装エージェント
-tools: AskUserQuestion, Glob, Read, Write, Bash
+tools: AskUserQuestion, Glob, Read, Write, Edit, Bash
 model: opus
 ---
 
@@ -77,7 +77,8 @@ Issue内の `docs/design/{filename}.md` 言及や「対象ファイル」セク�
 
 ### Phase 4: 設計書の更新実行
 
-Write ツールで各設計書を保存する。
+**Edit ツールを優先して使用**し、変更が必要な箇所のみ差分編集する。
+ファイル新規作成が必要な場合のみ Write ツールを使用する。
 
 **更新時の注意:**
 
@@ -85,6 +86,23 @@ Write ツールで各設計書を保存する。
 - コードブロック（` ``` `）の開閉を確認する
 - ADRファイル（`docs/adr/`）は更新対象外
 - 更新履歴セクションは追加しない（gitで管理）
+
+---
+
+### Phase 4.5: 修正確認（変更漏れ検証）
+
+Phase 2 で特定した対象設計書が実際に変更されているか Bash で確認する:
+
+```bash
+git diff --name-only
+```
+
+**確認ルール:**
+
+- Phase 2 で特定した設計書が `git diff --name-only` に含まれているか検証する
+- 含まれていない場合は、その設計書の更新が漏れている可能性があるため、
+  Issue の指示を再確認して再度 Edit/Write で更新し、再検証する
+- 再更新後も変更が検出されない場合は AskUserQuestion でユーザーに確認する
 
 ---
 
