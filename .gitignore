@@ -42,9 +42,6 @@ integration-tests/test-reports/
 integration-tests/test-results/
 integration-tests/playwright-report/
 
-# Claude
-docs/plan/
-
 # Pyhon
 __pycache__/
 *.pyc

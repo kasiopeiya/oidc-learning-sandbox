@@ -18,6 +18,9 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
 
 1. アイデア作成：docs/ideaにやりたいことを記載
 2. Plan作成：Planモードで事前調査と仕様の相談
+   - Planファイルは `docs/plan/template.md` をベースに作成すること
+   - **必須：** 「設計書への影響」セクションを必ず含めること。更新不要な場合も「更新不要・理由：〇〇」と明記すること
+   - **必須：** タスク一覧に設計書更新タスクを含めること（更新不要な場合を除く）
 3. PlanとIssue作成：`/create-issue`でGitHub Issuesにissueを作成
 4. 設計書更新：Issue番号を引数に`/design`を実行し、以下を実施
    - `/update-design`で設計書更新
