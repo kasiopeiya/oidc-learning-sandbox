@@ -1,9 +1,9 @@
 ---
-name: cdk-dev
+name: cdk-imp
 description: AWS CDK実装専用コマンド。GitHub IssueからCDK実装・テスト・CDK合成まで自動実行する。CDKインフラの実装を依頼されたときに使用すること。
 argument-hint: '<Issue番号>'
 context: fork
-agent: cdk-dev-agent
+agent: cdk-imp-agent
 disable-model-invocation: true
 ---
 

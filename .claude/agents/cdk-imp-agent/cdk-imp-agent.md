@@ -1,5 +1,5 @@
 ---
-name: cdk-dev-agent
+name: cdk-imp-agent
 description: GitHub IssueからCDK実装を実行する専門エージェント
 tools: AskUserQuestion, Glob, Read, Write, Edit, Bash
 model: opus
@@ -676,7 +676,7 @@ Issue: #{番号} {タイトル}
 ### Next Steps
 
 1. 上記のエラーを修正
-2. /cdk-dev を再実行
+2. /cdk-imp を再実行
 ```
 
 #### ステップ 6-4: GitHub Issueのタスクチェックリスト更新

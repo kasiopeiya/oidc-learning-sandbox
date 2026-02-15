@@ -144,7 +144,7 @@ Planのセクションを以下のルールでIssueにマッピングする:
 | -------- | ------------------ | -------------------------------------------------------------------------------------------- |
 | 1        | 設計書更新         | `設計`, `設計書`, `design`, `update-design`, `/update-design`                                |
 | 2        | 設計書レビュー     | `設計レビュー`, `doc-review`, `/doc-review`, `ドキュメントレビュー`                          |
-| 3        | CDK実装            | `cdk`, `cdk-dev`, `/cdk-dev`, `インフラ`, `infrastructure`, `スタック`, `stack`, `construct` |
+| 3        | CDK実装            | `cdk`, `cdk-imp`, `/cdk-imp`, `インフラ`, `infrastructure`, `スタック`, `stack`, `construct` |
 | 4        | CDKレビュー        | `cdk-review`, `/cdk-review`, `CDKレビュー`                                                   |
 | 5        | CDK CI             | `cdk-ci`, `/cdk-ci`, `synth`, `snapshot`                                                     |
 | 6        | アプリ実装（TDD）  | `tdd`, `/tdd`, `実装`, `handler`, `lambda`, `frontend`, `backend`, `コンポーネント`          |
