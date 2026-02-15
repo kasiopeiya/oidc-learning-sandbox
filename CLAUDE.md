@@ -37,7 +37,7 @@ AWS CDKを用いて、OPとRP（Lambda）を構築し、実際の挙動をハン
    - `/code-ci`の実行結果をもとに実装を修正
    - `/validate-design`で設計書と実装の整合性チェック
    - `/validate-design`の実行結果をもとに設計書を修正（実装から設計へのフィードバック）
-7. cdk実装の場合
+7. cdk実装の場合 Issue番号を引数に`/cdk-dev`を実行、以下を実施
    - `/cdk-imp`で実装　＊CDKはテスト駆動開発できないので/tddではなくこちらを使用
    - `/cdk-review`でコードレビュー
    - `/cdk-review`の実行結果を元に実装修正
