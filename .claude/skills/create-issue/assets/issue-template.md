@@ -44,3 +44,12 @@
 
 {{references}}
 {{/if}}
+
+<details>
+<summary>📄 Plan全文（参照用）</summary>
+
+```markdown
+{{plan_full_text}}
+```
+
+</details>

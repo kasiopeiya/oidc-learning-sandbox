@@ -11,6 +11,7 @@ disable-model-invocation: true
 **制約事項**:
 
 - ローカルファイルは作成しない（`docs/issues/` へのファイル保存は行わない）
-- PlanのすべてのセクションをIssueに反映する
+- PlanのすべてのセクションをIssueに**一字一句そのまま（verbatim）**反映すること（要約・省略・パラフレーズ禁止）
+- Planの全文を `<details>` セクションとしてIssueに添付すること
 - テンプレートは `assets/issue-template.md` を参照すること
 - `gh issue create` コマンドでGitHub Issueを作成すること
