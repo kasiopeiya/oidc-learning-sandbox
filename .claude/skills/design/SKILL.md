@@ -14,10 +14,14 @@ Issue番号: $ARGUMENTS
 
 ## 実行手順
 
-1. **Phase 1**: `update-design-agent` を Task ツールで起動し、Issue番号 `$ARGUMENTS` を渡して完了を待つ
-2. **Phase 2**: Phase 1 完了後、Phase 1 で更新された設計書を対象に `doc-reviewer-agent` を Task ツールで起動し、完了を待つ
-3. **Phase 3**: Phase 2 のレビュー結果をもとに `update-design-agent` を Task ツールで起動し、指摘事項を反映した設計書の修正を行う。その際 Phase 2 の出力をそのままプロンプトに含めること
-4. 各フェーズの出力を**そのまま全文表示**する（要約・加工・コメント追加は禁止）
+1. **Phase 0（Issue読み込み）**: `gh issue view $ARGUMENTS --json number,title,body,labels` でIssue情報を取得し、以降のPhaseで参照できるよう保持する
+2. **Phase 1**: `update-design-agent` を Task ツールで起動し、Issue番号 `$ARGUMENTS` を渡して完了を待つ
+3. **Phase 2**: Phase 1 完了後、Phase 1 で更新された設計書を対象に `doc-reviewer-agent` を Task ツールで起動し、完了を待つ。その際、Phase 0 で取得したIssue情報（番号・タイトル・スコープ）をプロンプトに含め、「このIssueの意図に基づいて設計書が更新されている」ことを伝えること
+4. **Phase 3**: Phase 2 のレビュー結果をもとに `update-design-agent` を Task ツールで起動し、指摘事項を反映した設計書の修正を行う。その際以下をプロンプトに含めること：
+   - Phase 2 の出力（レビュー結果）をそのまま含める
+   - Phase 0 で取得したIssue情報を含める
+   - **「Issueの意図に反する修正は行わないこと。レビュー指摘がIssueの計画と矛盾する場合は、Issueの意図を優先し、該当指摘はスキップすること」** という指示を明記する
+5. 各フェーズの出力を**そのまま全文表示**する（要約・加工・コメント追加は禁止）
 
 ## エラーハンドリング
 
