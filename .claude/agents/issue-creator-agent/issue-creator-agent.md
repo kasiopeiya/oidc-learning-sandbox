@@ -210,14 +210,29 @@ gh label list --json name --jq '.[].name' | grep -q "^{label}$" || gh label crea
 
 #### GitHub Issue の作成
 
-`gh issue create` コマンドで GitHub Issues を作成する:
+**重要: シェルエスケープ問題の回避**
+
+Issue本文にはバッククォート（`` ` ``）やMarkdown記法が含まれるため、`--body` で直接渡すとシェルがバッククォートをコマンド置換として解釈し、エラーが発生する。必ず以下の手順で一時ファイル経由で渡すこと:
+
+1. Write ツールでIssue本文を一時ファイルに書き出す（パス: `/tmp/gh-issue-body.md`）
+2. `gh issue create` コマンドで `--body-file` オプションを使用する
+3. 作成後に一時ファイルを削除する
 
 ```bash
 gh issue create \
   --title "{タイトル}" \
-  --body "{Issue本文}" \
+  --body-file /tmp/gh-issue-body.md \
   --label "{ラベル1},{ラベル2}"
 ```
+
+```bash
+rm -f /tmp/gh-issue-body.md
+```
+
+**禁止事項:**
+- `--body` オプションの使用（バッククォートのエスケープ問題が発生するため）
+- ヒアドキュメント（heredoc）での本文渡し（同様にエスケープ問題が発生する）
+- Pythonスクリプト等での回避策（不要な複雑さ）
 
 複数Issue作成の場合は各Issueを順次作成し、進捗を表示する。
 
