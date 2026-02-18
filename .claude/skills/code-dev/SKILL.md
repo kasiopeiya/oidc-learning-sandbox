@@ -26,8 +26,10 @@ TDD実装 → コードレビュー → レビュー指摘修正 → CI実行 �
 ## Phase 1 (tdd-agent) 呼び出しプロンプト例
 
 ```
-指定されたGitHub IssueからTDDサイクル（Red-Green-Refactor）を実行してください。
-完了したタスクは `gh issue edit` コマンドでGitHub Issueのチェックリストを更新してください。
+指定されたGitHub Issueからアプリケーションコード（backend/、frontend/ディレクトリ配下）のみを対象にTDDサイクル（Red-Green-Refactor）を実行してください。
+cdk/配下のインフラコードは絶対に実装・変更しないでください。
+Issueのタスク一覧のうち、アプリケーションコード（backend/frontend）に関するタスクのみを対象としてください。
+完了したアプリケーションコードタスクのみ `gh issue edit` コマンドでGitHub Issueのチェックリストを更新してください。
 
 Issue指定: $ARGUMENTS
 

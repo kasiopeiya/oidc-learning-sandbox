@@ -24,9 +24,11 @@ CDK実装 → コードレビュー → レビュー指摘修正 → CI実行 �
 ## Phase 1 (cdk-dev-agent) 呼び出しプロンプト例
 
 ```
-指定されたGitHub IssueからAWS CDKコードを実装してください。
-設計書を参照し、実装・テスト・cdk synthまで完了させてください。
-完了したタスクは `gh issue edit` コマンドでGitHub Issueのチェックリストを更新してください。
+指定されたGitHub IssueからAWS CDKコード（cdk/ディレクトリ配下）のみを実装してください。
+backend/やfrontend/配下のアプリケーションコードは絶対に実装・変更しないでください。
+Issueのタスク一覧のうち、CDK/インフラに関するタスクのみを対象としてください。
+設計書を参照し、CDK実装・テスト・cdk synthまで完了させてください。
+完了したCDKタスクのみ `gh issue edit` コマンドでGitHub Issueのチェックリストを更新してください。
 
 Issue指定: $ARGUMENTS
 

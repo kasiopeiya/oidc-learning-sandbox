@@ -7,8 +7,10 @@ agent: cdk-imp-agent
 disable-model-invocation: true
 ---
 
-指定されたGitHub Issueを元に、設計書を参照してAWS CDKコードを実装し、テスト・合成まで実行してください。
-完了したタスクは `gh issue edit` コマンドでGitHub Issueのチェックリストを更新してください。
+指定されたGitHub Issueを元に、設計書を参照してAWS CDKコード（cdk/ディレクトリ配下）のみを実装し、テスト・合成まで実行してください。
+backend/やfrontend/配下のアプリケーションコードは絶対に実装・変更しないでください。
+Issueのタスク一覧のうち、CDK/インフラに関するタスクのみを対象としてください。
+完了したCDKタスクのみ `gh issue edit` コマンドでGitHub Issueのチェックリストを更新してください。
 
 Issue指定: <skill-args>
 
