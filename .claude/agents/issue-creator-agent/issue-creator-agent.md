@@ -1,7 +1,7 @@
 ---
 name: issue-creator-agent
 description: Convert Plan mode output to GitHub Issues format with metadata collection
-tools: Read, Glob, Bash, AskUserQuestion
+tools: Read, Glob, Bash
 model: sonnet
 ---
 
@@ -41,44 +41,9 @@ Read ツールで全文を読み込み、以下の必須項目を確認（不足
 
 ---
 
-### Phase 1.5: 複数Issue分割の確認（オプション）
+### Phase 2: ラベルの自動推論
 
-#### ステップ 1.5-1: セクション構造の解析
-
-Planファイルから `## ` レベルの見出し一覧を抽出する。
-
-#### ステップ 1.5-2: 分割の確認
-
-AskUserQuestion で確認:
-
-```
-question: "このPlanを複数のIssueに分割しますか？"
-header: "Issue分割"
-options: [
-  { label: "1つのIssueとして作成（デフォルト）" },
-  { label: "複数のIssueに分割" }
-]
-```
-
-- 「1つのIssueとして作成」→ Phase 2へ
-- 「複数のIssueに分割」→ ステップ 1.5-3へ
-
-#### ステップ 1.5-3: 分割位置の決定
-
-Issue 2以降の開始セクションをユーザーに順次質問し、分割情報を確定する。分割が完了したらプレビューを表示して最終確認を行う。
-
----
-
-### Phase 2: 依存関係の入力とラベルの自動推論
-
-#### ステップ 2-1: 依存関係の入力
-
-AskUserQuestion で各Issueの依存関係を収集する。
-
-- 複数Issue作成時の Issue 2以降は「前のIssueに依存」を推奨選択肢として提示
-- 入力値バリデーション（不正な場合は再質問、最大3回）
-
-#### ステップ 2-2: ラベルの自動推論
+#### ステップ 2-1: ラベルの自動推論
 
 Planファイルの内容（タイトル・ファイルパス・セクション）を解析し、以下のルールでラベルを自動付与する。
 
@@ -185,7 +150,6 @@ Planのセクションを以下のルールでIssueにマッピングする:
 `assets/issue-template.md` を参照してIssue本文を生成する。変数は以下の通り:
 
 - `{{title}}`: タイトル
-- `{{dependencies_list}}`: 依存関係（例: `#14, #15`）
 - `{{labels_list}}`: ラベル（例: `infra, cdk`）
 - `{{background}}`: 背景/目的の内容（verbatim転記）
 - `{{context}}`: Critical Filesの内容（存在しない場合はセクション自体を省略、verbatim転記）
