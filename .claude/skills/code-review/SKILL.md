@@ -4,7 +4,6 @@ description: TypeScript アプリケーションコードをレビュー。/code
 argument-hint: '[ファイルパス]'
 context: fork
 agent: code-reviewer-agent
-disable-model-invocation: true
 ---
 
 TypeScript アプリケーションコードをレビューしてください。

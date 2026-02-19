@@ -3,7 +3,6 @@ name: cdk-ci
 description: CDKインフラコードの静的解析・スナップショットテスト・cdk synthを実行する。インフラコードのCDK CIチェックを依頼されたときに使用すること。
 context: fork
 agent: cdk-ci-runner
-disable-model-invocation: true
 ---
 
 CDK インフラストラクチャコードの静的解析、Snapshotテスト、cdk synth を実行し、結果をレポートしてください。

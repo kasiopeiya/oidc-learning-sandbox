@@ -6,7 +6,6 @@ description: >
 argument-hint: '[backend|frontend|all]'
 context: fork
 agent: design-validator-agent
-disable-model-invocation: true
 ---
 
 引数: 設計書とアプリケーションコードの整合性を検証してください。

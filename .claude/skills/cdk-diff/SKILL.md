@@ -3,7 +3,6 @@ name: cdk-diff
 description: cdk diffを実行し、変更内容をMarkdownテーブルで整形して表示する。インフラ変更のレビューやデプロイ前確認に使用する。
 context: fork
 agent: general-purpose
-disable-model-invocation: true
 ---
 
 以下の手順を実行する：
