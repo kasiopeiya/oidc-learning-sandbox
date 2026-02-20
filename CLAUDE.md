@@ -97,7 +97,6 @@ cd cdk && source deploy.sh
 │   ├── ADR/                  # ADR、メンテ不要
 │   ├── design/               # 設計書（backend, frontend, infrastructureなど）要メンテ（最優先参照）
 │   ├── idea/                 # アイデアメモ、メンテ不要
-│   ├── plan/                 # プランファイルの一時保管場所、メンテ不要
 │   ├── init/                 # 初期構築時のドキュメント、メンテ不要
 │   └── img/                  # 画像ファイル（シーケンス図など）
 │
